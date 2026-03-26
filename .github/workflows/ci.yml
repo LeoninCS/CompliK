@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  golangci-lint:
+  lint-and-test:
     name: Lint and Test
     runs-on: ubuntu-24.04
     steps:
@@ -33,31 +33,36 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
 
       - name: Go test
         run: |
           go test -v -timeout 30s -count=1 ./...
 
-      - name: Run Linter
+      - name: Run Linter (block-controller)
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
-          args: --color=always --path-mode=abs
+          working-directory: block-controller
+          args: --color=always
 
-      - name: Run Fix Linter
+      - name: Run Linter (complik)
         uses: golangci/golangci-lint-action@v9
-        if: ${{ failure() }}
         with:
-          install-mode: none
-          args: --fix --color=always --path-mode=abs
+          version: latest
+          working-directory: complik
+          args: --color=always
 
-      - name: Auto Fix Diff Content
-        if: ${{ failure() }}
-        run: |
-          if git diff --exit-code --color=always; then
-            echo "No changes detected after auto-fix"
-          else
-            git diff --color=always
-            exit 1
-          fi
+      - name: Run Linter (procscan)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: procscan
+          args: --color=always
+
+      - name: Run Linter (analyze)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: analyze
+          args: --color=always

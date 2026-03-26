@@ -8,3 +8,19 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/complik"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/block-controller"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/procscan"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/analyze"
+    schedule:
+      interval: "daily"

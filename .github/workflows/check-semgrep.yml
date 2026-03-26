@@ -36,7 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: |
-          semgrep ci \
+          semgrep scan \
             --config p/ci \
             --config p/security-audit \
             --config p/golang \
+            --error
