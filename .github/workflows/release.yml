@@ -2,51 +2,57 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*.*.*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  GHCR_REPO: ghcr.io/${{ github.repository_owner }}
 
 jobs:
-  # ==================== CompliK 镜像 ====================
-  build-complik:
-    name: Build CompliK
-    runs-on: ubuntu-latest
+  build-and-push:
+    name: Build and Push ${{ matrix.component }}
+    runs-on: ubuntu-24.04
     permissions:
       packages: write
+    strategy:
+      matrix:
+        include:
+          - component: block-controller
+            context: block-controller
+            dockerfile: block-controller/Dockerfile
+          - component: complik
+            context: complik
+            dockerfile: complik/Dockerfile
+            pre-build: true
+            build-cmd: CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w" -o bin/service-complik-$TARGETARCH cmd/complik/main.go
+          - component: procscan
+            context: procscan
+            dockerfile: procscan/Dockerfile
+            pre-build: true
+            build-cmd: CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w" -o bin/service-procscan-$TARGETARCH cmd/procscan/main.go
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Setup Go
+        if: ${{ matrix.pre-build }}
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
-          cache: true
+          go-version-file: "go.work"
 
-      # 构建二进制文件
-      - name: Build binaries
+      - name: Pre-build binaries
+        if: ${{ matrix.pre-build }}
+        working-directory: ${{ matrix.context }}
         run: |
-          mkdir -p bin
-          
-          # 构建 amd64
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
-            go build -trimpath -ldflags="-s -w" \
-            -o bin/service-complik-amd64 ./cmd/complik
-          
-          # 构建 arm64
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
-            go build -trimpath -ldflags="-s -w" \
-            -o bin/service-complik-arm64 ./cmd/complik
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          for arch in amd64 arm64; do
+            TARGETARCH=$arch
+            CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w" \
+              -o bin/service-${{ matrix.component }}-$TARGETARCH cmd/*/main.go
+          done
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -55,113 +61,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to DockerHub
-        if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ github.repository }}
-            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/complik', secrets.DOCKERHUB_USERNAME) || '' }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ==================== Procscan 镜像 ====================
-  build-procscan:
-    name: Build Procscan
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      # 构建二进制文件
-      - name: Build binaries
-        run: |
-          cd procscan
-          mkdir -p bin
-          
-          # 构建 amd64
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
-            go build -trimpath -ldflags="-s -w" \
-            -o bin/service-procscan-amd64 ./cmd/procscan
-          
-          # 构建 arm64
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
-            go build -trimpath -ldflags="-s -w" \
-            -o bin/service-procscan-arm64 ./cmd/procscan
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to DockerHub
-        if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
+      - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}/procscan
-            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/procscan', secrets.DOCKERHUB_USERNAME) || '' }}
+          images: ${{ env.GHCR_REPO }}/${{ matrix.component }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./procscan
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

@@ -1,14 +1,26 @@
 version: 2
 updates:
-  # GitHub Actions 依赖更新
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-
-  # Go 模块依赖更新
+      interval: "daily"
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/complik"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/block-controller"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/procscan"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/analyze"
+    schedule:
+      interval: "daily"
