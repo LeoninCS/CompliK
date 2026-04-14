@@ -20,29 +20,14 @@ resources:
 
 containerPort: 8428
 
-database:
-  create: true
-
 rbac:
   create: true
   name: complik-sa
 
 external:
-  region: "hzh"
-  ai:
-    apiKey: ""
-    apiBase: "https://aiproxy.usw.sealos.io/v1"
-    apiPath: "/chat/completions"
-    model: "gpt-5"
-
-  database:
-    host: ""
-    port: "3306"
-    username: "root"
-    password: ""
-
-  lark:
-    webhook: ""
+  admin:
+    baseURL: "http://sealos-complik-admin:8080"
+    timeoutSecond: 10
 
 plugins:
   complete:
@@ -80,12 +65,10 @@ plugins:
 
   custom:
     enabled: false
-    databaseName: "custom"
     tickerMinute: 800
     maxWorkers: 20
-    tableName: "CustomKeywordRule"
 
-  postgres:
+  adminReporter:
     enabled: true
 
   lark:

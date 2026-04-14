@@ -59,47 +59,34 @@ data:
         enabled: {{ .Values.plugins.safety.enabled }}
         settings: |
           {
-            "apiKey": {{ .Values.external.ai.apiKey | quote }},
-            "apiBase": {{ .Values.external.ai.apiBase | quote }},
-            "apiPath": {{ .Values.external.ai.apiPath | quote }},
-            "model": {{ .Values.external.ai.model | quote }}
+            "adminBaseURL": {{ .Values.external.admin.baseURL | quote }},
+            "adminTimeoutSecond": {{ .Values.external.admin.timeoutSecond }}
           }
       - name: "Custom"
         type: "Compliance"
         enabled: {{ .Values.plugins.custom.enabled }}
         settings: |
           {
-            "databaseName": {{ .Values.plugins.custom.databaseName | quote }},
             "tickerMinute": {{ .Values.plugins.custom.tickerMinute }},
             "maxWorkers": {{ .Values.plugins.custom.maxWorkers }},
-            "host": {{ .Values.external.database.host | quote }},
-            "port": {{ .Values.external.database.port | quote }},
-            "username": {{ .Values.external.database.username | quote }},
-            "password": {{ .Values.external.database.password | quote }},
-            "tableName": {{ .Values.plugins.custom.tableName | quote }},
-            "apiKey": {{ .Values.external.ai.apiKey | quote }},
-            "apiBase": {{ .Values.external.ai.apiBase | quote }},
-            "apiPath": {{ .Values.external.ai.apiPath | quote }},
-            "model": {{ .Values.external.ai.model | quote }}
+            "adminBaseURL": {{ .Values.external.admin.baseURL | quote }},
+            "adminTimeoutSecond": {{ .Values.external.admin.timeoutSecond }}
           }
-      - name: "Postgres"
+      - name: "AdminReporter"
         type: "Handle"
-        enabled: {{ .Values.plugins.postgres.enabled }}
+        enabled: {{ .Values.plugins.adminReporter.enabled }}
         settings: |
           {
-            "region": {{ .Values.external.region | quote }},
-            "host": {{ .Values.external.database.host | quote }},
-            "port": {{ .Values.external.database.port | quote }},
-            "username": {{ .Values.external.database.username | quote }},
-            "password": {{ .Values.external.database.password | quote }}
+            "adminBaseURL": {{ .Values.external.admin.baseURL | quote }},
+            "adminTimeoutSecond": {{ .Values.external.admin.timeoutSecond }}
           }
       - name: "Lark"
         type: "Handle"
         enabled: {{ .Values.plugins.lark.enabled }}
         settings: |
           {
-            "region": {{ .Values.external.region | quote }},
-            "webhook": {{ .Values.external.lark.webhook | quote }}
+            "adminBaseURL": {{ .Values.external.admin.baseURL | quote }},
+            "adminTimeoutSecond": {{ .Values.external.admin.timeoutSecond }}
           }
     logging:
       level: {{ .Values.config.logging.level | quote }}
