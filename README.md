@@ -196,7 +196,7 @@ The `Makefile` in the root directory provides a unified build entry point, but e
 
 | Project | Module Path | Go Version | Main Dependencies |
 |---------|------------|------------|------------------|
-| **complik** | `github.com/bearslyricattack/CompliK/complik` | 1.24.5 | k8s.io v0.33.4, gorm, go-rod |
+| **complik** | `github.com/bearslyricattack/CompliK/complik` | 1.24.5 | k8s.io v0.33.4, go-rod |
 | **block-controller** | `github.com/bearslyricattack/CompliK/block-controller` | 1.24.5 | k8s.io v0.34.0, controller-runtime v0.22.1 |
 | **procscan** | `github.com/bearslyricattack/CompliK/procscan` | 1.24.5 | k8s.io v0.33.4, prometheus client |
 
