@@ -1,4 +1,18 @@
-package postages
+// Copyright 2025 CompliK Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package reporter
 
 import (
 	"bytes"
@@ -10,13 +24,10 @@ import (
 	"time"
 
 	"github.com/bearslyricattack/CompliK/complik/pkg/models"
+	"github.com/bearslyricattack/CompliK/complik/pkg/utils/config"
 )
 
-const (
-	defaultAdminBaseURL   = "http://sealos-complik-admin:8080"
-	defaultAdminTimeout   = 10 * time.Second
-	complikViolationsPath = "/api/complik-violations"
-)
+const complikViolationsPath = "/api/complik-violations"
 
 type complikViolationRequest struct {
 	Namespace     string    `json:"namespace"`
@@ -38,7 +49,7 @@ type complikViolationRequest struct {
 	RawPayload    any       `json:"raw_payload,omitempty"`
 }
 
-func (p *DatabasePlugin) reportViolation(result *models.DetectorInfo) error {
+func (p *AdminReporterPlugin) reportViolation(result *models.DetectorInfo) error {
 	if result == nil {
 		return fmt.Errorf("detector result is nil")
 	}
@@ -72,21 +83,15 @@ func (p *DatabasePlugin) reportViolation(result *models.DetectorInfo) error {
 	return postJSON(ctx, p.adminEndpoint(), requestBody)
 }
 
-func (p *DatabasePlugin) adminEndpoint() string {
-	baseURL := strings.TrimSpace(p.databaseConfig.AdminBaseURL)
-	if baseURL == "" {
-		baseURL = defaultAdminBaseURL
-	}
-
-	return strings.TrimRight(baseURL, "/") + complikViolationsPath
+func (p *AdminReporterPlugin) adminEndpoint() string {
+	return config.NormalizeAdminBaseURL(p.reporterConfig.AdminBaseURL) + complikViolationsPath
 }
 
-func (p *DatabasePlugin) adminTimeout() time.Duration {
-	if p.databaseConfig.AdminTimeoutSecond <= 0 {
-		return defaultAdminTimeout
+func (p *AdminReporterPlugin) adminTimeout() time.Duration {
+	if p.reporterConfig.AdminTimeoutSecond <= 0 {
+		return time.Duration(config.DefaultAdminTimeoutSecond) * time.Second
 	}
-
-	return time.Duration(p.databaseConfig.AdminTimeoutSecond) * time.Second
+	return time.Duration(p.reporterConfig.AdminTimeoutSecond) * time.Second
 }
 
 func isComplikTestEvent(result *models.DetectorInfo) bool {
@@ -101,7 +106,6 @@ func isComplikTestEvent(result *models.DetectorInfo) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -126,6 +130,5 @@ func postJSON(ctx context.Context, endpoint string, payload any) error {
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
-
 	return nil
 }

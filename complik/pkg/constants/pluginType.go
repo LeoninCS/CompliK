@@ -26,6 +26,6 @@ const (
 )
 
 const (
-	HandleDatabasePluginType = "Handle.Database"
-	HandleLarkPluginType     = "Handle.Lark"
+	HandleAdminPluginType = "Handle.Admin"
+	HandleLarkPluginType  = "Handle.Lark"
 )

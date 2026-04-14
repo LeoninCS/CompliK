@@ -13,8 +13,7 @@
 // limitations under the License.
 
 // Package lark implements a notification plugin for Lark (Feishu) messaging platform.
-// It provides webhook-based notifications for detection results with optional
-// whitelist support to filter notifications based on namespace or host.
+// Runtime settings and whitelist rules are loaded from admin configs.
 package lark
 
 import (
@@ -22,8 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,14 +32,12 @@ import (
 	"github.com/bearslyricattack/CompliK/complik/pkg/plugin"
 	"github.com/bearslyricattack/CompliK/complik/pkg/utils/config"
 	"github.com/bearslyricattack/CompliK/complik/plugins/handle/lark/whitelist"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	gormLogger "gorm.io/gorm/logger"
 )
 
 const (
-	pluginName = constants.HandleLark
-	pluginType = constants.HandleLarkPluginType
+	pluginName          = constants.HandleLark
+	pluginType          = constants.HandleLarkPluginType
+	whitelistConfigType = "complik_whitelist"
 )
 
 func init() {
@@ -69,27 +65,13 @@ func (p *LarkPlugin) Type() string {
 type LarkConfig struct {
 	Region             string `json:"region"`
 	Webhook            string `json:"webhook"`
-	EnabledWhitelist   *bool  `json:"enabled_whitelist"`
-	Host               string `json:"host"`
-	Port               string `json:"port"`
-	Username           string `json:"username"`
-	Password           string `json:"password"`
-	DatabaseName       string `json:"databaseName"`
-	TableName          string `json:"tableName"`
-	Charset            string `json:"charset"`
-	HostTimeoutHour    int    `json:"host_timeout_hour"`
 	AdminBaseURL       string `json:"adminBaseURL"`
 	AdminTimeoutSecond int    `json:"adminTimeoutSecond"`
 }
 
 func (p *LarkPlugin) getDefaultConfig() LarkConfig {
-	b := false
 	return LarkConfig{
 		Region:             "UNKNOWN",
-		EnabledWhitelist:   &b,
-		DatabaseName:       "complik",
-		TableName:          "whitelist",
-		Charset:            "utf8mb4",
 		AdminBaseURL:       config.DefaultAdminBaseURL,
 		AdminTimeoutSecond: config.DefaultAdminTimeoutSecond,
 	}
@@ -97,53 +79,17 @@ func (p *LarkPlugin) getDefaultConfig() LarkConfig {
 
 func (p *LarkPlugin) loadConfig(setting string) error {
 	p.larkConfig = p.getDefaultConfig()
-	if setting == "" {
+	if strings.TrimSpace(setting) == "" {
 		return errors.New("configuration cannot be empty")
 	}
 	var configFromJSON LarkConfig
-	err := json.Unmarshal([]byte(setting), &configFromJSON)
-	if err != nil {
+	if err := json.Unmarshal([]byte(setting), &configFromJSON); err != nil {
 		p.log.Error("Failed to parse config", logger.Fields{
 			"error": err.Error(),
 		})
 		return err
 	}
-	if configFromJSON.EnabledWhitelist != nil && *configFromJSON.EnabledWhitelist {
-		p.larkConfig.EnabledWhitelist = configFromJSON.EnabledWhitelist
-		if configFromJSON.Host == "" {
-			return errors.New("host configuration cannot be empty")
-		}
-		if configFromJSON.Port == "" {
-			return errors.New("port configuration cannot be empty")
-		}
-		if configFromJSON.Username == "" {
-			return errors.New("username configuration cannot be empty")
-		}
-		if configFromJSON.Password == "" {
-			return errors.New("password configuration cannot be empty")
-		}
-		p.larkConfig.Host = configFromJSON.Host
-		p.larkConfig.Port = configFromJSON.Port
-		p.larkConfig.Username = configFromJSON.Username
-		// Support retrieving password from environment variable or encrypted value
-		if pwd, err := config.GetSecureValue(configFromJSON.Password); err == nil {
-			p.larkConfig.Password = pwd
-		} else {
-			p.larkConfig.Password = configFromJSON.Password
-		}
-	}
-	if configFromJSON.HostTimeoutHour > 0 {
-		p.larkConfig.HostTimeoutHour = configFromJSON.HostTimeoutHour
-	}
-	if configFromJSON.DatabaseName != "" {
-		p.larkConfig.DatabaseName = configFromJSON.DatabaseName
-	}
-	if configFromJSON.TableName != "" {
-		p.larkConfig.TableName = configFromJSON.TableName
-	}
-	if configFromJSON.Charset != "" {
-		p.larkConfig.Charset = configFromJSON.Charset
-	}
+
 	if strings.TrimSpace(configFromJSON.AdminBaseURL) != "" {
 		if secureValue, err := config.GetSecureValue(configFromJSON.AdminBaseURL); err == nil {
 			p.larkConfig.AdminBaseURL = secureValue
@@ -184,102 +130,139 @@ func (p *LarkPlugin) applyNotificationsRuntimeConfig(ctx context.Context) error 
 	return nil
 }
 
-func (p *LarkPlugin) initDB() (db *gorm.DB, err error) {
-	serverDSN := p.buildDSN(false)
-	dbConfig := &gorm.Config{
-		Logger: gormLogger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			gormLogger.Config{
-				SlowThreshold: 3 * time.Second,  // Slow query threshold set to 3 seconds
-				LogLevel:      gormLogger.Error, // Show only error logs
-				Colorful:      false,            // Disable color output
-			},
-		),
-	}
-	db, err = gorm.Open(mysql.Open(serverDSN), dbConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to MySQL server: %w", err)
-	}
-	createDBSQL := fmt.Sprintf(
-		"CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET %s COLLATE %s_unicode_ci",
-		p.larkConfig.DatabaseName,
-		p.larkConfig.Charset,
-		p.larkConfig.Charset,
+func (p *LarkPlugin) loadWhitelistService(ctx context.Context) (*whitelist.WhitelistService, int, error) {
+	cfgs, err := config.ListAdminProjectConfigsByType(
+		ctx,
+		p.larkConfig.AdminBaseURL,
+		p.larkConfig.AdminTimeoutSecond,
+		whitelistConfigType,
 	)
-	err = db.Exec(createDBSQL).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to create database: %w", err)
+		return nil, 0, err
 	}
-	dbDSN := p.buildDSN(true)
-	db, err = gorm.Open(mysql.Open(dbDSN), dbConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	if len(cfgs) == 0 {
+		return nil, 0, nil
 	}
-	return db, nil
+
+	sort.Slice(cfgs, func(i, j int) bool {
+		return cfgs[i].ConfigName < cfgs[j].ConfigName
+	})
+
+	rules := make([]whitelist.Whitelist, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		rule, parseErr := parseWhitelistRuleConfig(cfg)
+		if parseErr != nil {
+			p.log.Warn("Skip invalid whitelist config", logger.Fields{
+				"config_name": cfg.ConfigName,
+				"error":       parseErr.Error(),
+			})
+			continue
+		}
+		rules = append(rules, rule)
+	}
+	if len(rules) == 0 {
+		return nil, 0, errors.New("no valid whitelist rules found in admin configs")
+	}
+	return whitelist.NewWhitelistService(rules, p.larkConfig.Region), len(rules), nil
 }
 
-func (p *LarkPlugin) buildDSN(includeDB bool) string {
-	dbPart := "/"
-	if includeDB {
-		dbPart = "/" + p.larkConfig.DatabaseName
+func parseWhitelistRuleConfig(cfg config.AdminProjectConfig) (whitelist.Whitelist, error) {
+	var payload struct {
+		Type      string `json:"type"`
+		Region    string `json:"region"`
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+		Hostname  string `json:"hostname"`
+		Host      string `json:"host"`
+		Remark    string `json:"remark"`
+		ExpireAt  string `json:"expireAt"`
+		ExpiresAt string `json:"expiresAt"`
 	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)%s?charset=%s&parseTime=True&loc=Local",
-		p.larkConfig.Username,
-		p.larkConfig.Password,
-		p.larkConfig.Host,
-		p.larkConfig.Port,
-		dbPart,
-		p.larkConfig.Charset,
-	)
+	if err := cfg.DecodeValue(&payload); err != nil {
+		return whitelist.Whitelist{}, err
+	}
+
+	ruleType := whitelist.WhitelistType(strings.ToLower(strings.TrimSpace(payload.Type)))
+	if ruleType != whitelist.WhitelistTypeNamespace && ruleType != whitelist.WhitelistTypeHost {
+		return whitelist.Whitelist{}, fmt.Errorf("invalid whitelist type %q", payload.Type)
+	}
+
+	namespace := strings.TrimSpace(payload.Namespace)
+	hostname := strings.TrimSpace(payload.Hostname)
+	if hostname == "" {
+		hostname = strings.TrimSpace(payload.Host)
+	}
+	switch ruleType {
+	case whitelist.WhitelistTypeNamespace:
+		if namespace == "" {
+			return whitelist.Whitelist{}, errors.New("namespace whitelist missing namespace")
+		}
+	case whitelist.WhitelistTypeHost:
+		if hostname == "" {
+			return whitelist.Whitelist{}, errors.New("host whitelist missing host/hostname")
+		}
+	}
+
+	name := strings.TrimSpace(payload.Name)
+	if name == "" {
+		name = strings.TrimSpace(cfg.ConfigName)
+	}
+	if name == "" {
+		name = string(ruleType) + "-" + time.Now().Format("20060102150405")
+	}
+
+	var expireAt *time.Time
+	expireAtRaw := strings.TrimSpace(payload.ExpireAt)
+	if expireAtRaw == "" {
+		expireAtRaw = strings.TrimSpace(payload.ExpiresAt)
+	}
+	if expireAtRaw != "" {
+		parsed, err := time.Parse(time.RFC3339, expireAtRaw)
+		if err != nil {
+			return whitelist.Whitelist{}, fmt.Errorf("invalid expiresAt/expireAt: %w", err)
+		}
+		expireAt = &parsed
+	}
+
+	createdAt := cfg.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
+
+	return whitelist.Whitelist{
+		ConfigName: cfg.ConfigName,
+		Region:     strings.TrimSpace(payload.Region),
+		Name:       name,
+		Namespace:  namespace,
+		Hostname:   hostname,
+		Type:       ruleType,
+		Remark:     strings.TrimSpace(payload.Remark),
+		CreatedAt:  createdAt,
+		UpdatedAt:  cfg.UpdatedAt,
+		ExpireAt:   expireAt,
+	}, nil
 }
 
 func (p *LarkPlugin) Start(
 	ctx context.Context,
-	config config.PluginConfig,
+	cfg config.PluginConfig,
 	eventBus *eventbus.EventBus,
 ) error {
-	err := p.loadConfig(config.Settings)
-	if err != nil {
+	if err := p.loadConfig(cfg.Settings); err != nil {
 		return err
 	}
-	if *p.larkConfig.EnabledWhitelist {
-		var db *gorm.DB
-		if db, err = p.initDB(); err != nil {
-			return fmt.Errorf("failed to initialize database: %w", err)
-		}
-		if err := db.AutoMigrate(&whitelist.Whitelist{}); err != nil {
-			return fmt.Errorf("database migration failed: %w", err)
-		}
-		p.notifier = NewNotifier(
-			p.larkConfig.Webhook,
-			db,
-			time.Duration(p.larkConfig.HostTimeoutHour)*time.Hour,
-			p.larkConfig.Region,
-		)
-		var count int64
-		db.Model(&whitelist.Whitelist{}).Count(&count)
-		if count == 0 {
-			testData := &whitelist.Whitelist{
-				Region:    "cn-beijing",
-				Name:      "Test Whitelist Item",
-				Namespace: "default",
-				Hostname:  "test.example.com",
-				Type:      "namespace",
-				Remark:    "This is a test data entry initialized to verify whitelist functionality",
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
-			}
-			if err := db.Create(testData).Error; err != nil {
-				p.log.Error("Failed to insert test data", logger.Fields{
-					"error": err.Error(),
-				})
-			} else {
-				p.log.Info("Test data inserted successfully")
-			}
-		}
-	} else {
-		p.notifier = NewNotifier(p.larkConfig.Webhook, nil, 0, "")
+
+	whitelistService, ruleCount, err := p.loadWhitelistService(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to load whitelist rules from admin: %w", err)
 	}
+	p.notifier = NewNotifier(p.larkConfig.Webhook, whitelistService, p.larkConfig.Region)
+	p.log.Info("Lark runtime config loaded from admin", logger.Fields{
+		"region":          p.larkConfig.Region,
+		"admin_base_url":  p.larkConfig.AdminBaseURL,
+		"whitelist_rules": ruleCount,
+	})
+
 	subscribe := eventBus.Subscribe(constants.DetectorTopic)
 	go func() {
 		defer func() {
@@ -305,8 +288,7 @@ func (p *LarkPlugin) Start(
 					continue
 				}
 				result.Region = p.larkConfig.Region
-				err := p.notifier.SendAnalysisNotification(result)
-				if err != nil {
+				if err := p.notifier.SendAnalysisNotification(result); err != nil {
 					p.log.Error("Failed to send notification", logger.Fields{
 						"error": err.Error(),
 					})

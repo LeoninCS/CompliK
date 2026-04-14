@@ -37,6 +37,8 @@ type AdminProjectConfig struct {
 	ConfigType  string          `json:"config_type"`
 	ConfigValue json.RawMessage `json:"config_value"`
 	Description string          `json:"description"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 // ModelRuntimeConfig carries model runtime overrides shared by detectors.

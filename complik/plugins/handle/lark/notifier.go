@@ -29,7 +29,6 @@ import (
 
 	"github.com/bearslyricattack/CompliK/complik/pkg/models"
 	"github.com/bearslyricattack/CompliK/complik/plugins/handle/lark/whitelist"
-	"gorm.io/gorm"
 )
 
 type Notifier struct {
@@ -39,13 +38,17 @@ type Notifier struct {
 	Region           string
 }
 
-func NewNotifier(webhookURL string, db *gorm.DB, timeout time.Duration, region string) *Notifier {
+func NewNotifier(
+	webhookURL string,
+	whitelistService *whitelist.WhitelistService,
+	region string,
+) *Notifier {
 	return &Notifier{
 		WebhookURL: webhookURL,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		WhitelistService: whitelist.NewWhitelistService(db, timeout),
+		WhitelistService: whitelistService,
 		Region:           region,
 	}
 }
