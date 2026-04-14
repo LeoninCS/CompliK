@@ -24,6 +24,7 @@ import (
 	"github.com/bearslyricattack/CompliK/complik/pkg/eventbus"
 	"github.com/bearslyricattack/CompliK/complik/pkg/k8s"
 	"github.com/bearslyricattack/CompliK/complik/pkg/logger"
+	"github.com/bearslyricattack/CompliK/complik/pkg/models"
 	"github.com/bearslyricattack/CompliK/complik/pkg/plugin"
 	"github.com/bearslyricattack/CompliK/complik/pkg/utils/config"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -448,18 +449,67 @@ func (p *EndPointInformerPlugin) setDifference(set1, set2 map[string]bool) []str
 }
 
 func (p *EndPointInformerPlugin) handleEndpointSliceEvent(endpointInfo *EndpointSliceInfo) {
+	discoveryEvents := p.toDiscoveryEvents(endpointInfo)
+	if len(discoveryEvents) == 0 {
+		p.log.Debug("No discovery events generated from EndpointSlice event", logger.Fields{
+			"namespace":   endpointInfo.Namespace,
+			"serviceName": endpointInfo.ServiceName,
+		})
+		return
+	}
+
 	p.log.Debug("Publishing EndpointSlice event", logger.Fields{
 		"namespace":        endpointInfo.Namespace,
 		"serviceName":      endpointInfo.ServiceName,
 		"readyCount":       endpointInfo.ReadyCount,
 		"matchedIngresses": len(endpointInfo.MatchedIngresses),
+		"discoveryEvents":  len(discoveryEvents),
 	})
 
-	p.eventBus.Publish(constants.DiscoveryTopic, eventbus.Event{
-		Payload: endpointInfo,
-	})
+	for _, event := range discoveryEvents {
+		p.eventBus.Publish(constants.DiscoveryTopic, eventbus.Event{
+			Payload: event,
+		})
+	}
 
 	p.log.Debug("EndpointSlice event published successfully")
+}
+
+func (p *EndPointInformerPlugin) toDiscoveryEvents(
+	endpointInfo *EndpointSliceInfo,
+) []models.DiscoveryInfo {
+	if endpointInfo == nil || len(endpointInfo.MatchedIngresses) == 0 {
+		return nil
+	}
+
+	events := make([]models.DiscoveryInfo, 0, len(endpointInfo.MatchedIngresses))
+	for _, ing := range endpointInfo.MatchedIngresses {
+		path := strings.TrimSpace(ing.Path)
+		if path == "" {
+			path = "/"
+		}
+		host := strings.TrimSpace(ing.Host)
+		if host == "" {
+			host = "*"
+		}
+		namespace := strings.TrimSpace(ing.Namespace)
+		if namespace == "" {
+			namespace = endpointInfo.Namespace
+		}
+
+		events = append(events, models.DiscoveryInfo{
+			DiscoveryName: p.Name(),
+			Name:          ing.Name,
+			Namespace:     namespace,
+			Host:          host,
+			Path:          []string{path},
+			ServiceName:   endpointInfo.ServiceName,
+			HasActivePods: endpointInfo.ReadyCount > 0,
+			PodCount:      endpointInfo.ReadyCount,
+		})
+	}
+
+	return events
 }
 
 func (p *EndPointInformerPlugin) checkServiceHasIngress(
