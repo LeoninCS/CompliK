@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package custom provides a compliance detector plugin that uses custom keyword rules
-// stored in a MySQL database to detect potentially illegal or non-compliant content.
-// The plugin periodically refreshes keyword rules from the database and uses an AI-powered
-// content reviewer to analyze collected website content against these rules.
+// Package custom provides a compliance detector plugin that loads custom keyword rules
+// from admin runtime configs and uses an AI-powered content reviewer to analyze collected
+// website content against these rules.
 package custom
 
 import (
@@ -23,9 +22,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"time"
 
@@ -36,9 +34,6 @@ import (
 	"github.com/bearslyricattack/CompliK/complik/pkg/plugin"
 	"github.com/bearslyricattack/CompliK/complik/pkg/utils/config"
 	"github.com/bearslyricattack/CompliK/complik/plugins/compliance/detector/utils"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	gormLogger "gorm.io/gorm/logger"
 )
 
 const (
@@ -57,7 +52,6 @@ func init() {
 type CustomPlugin struct {
 	log          logger.Logger
 	reviewer     *utils.ContentReviewer
-	db           *gorm.DB
 	keywords     []utils.CustomKeywordRule
 	customConfig CustomConfig
 }
@@ -71,32 +65,22 @@ func (p *CustomPlugin) Type() string {
 }
 
 type CustomConfig struct {
-	Dsn          string `json:"dsn"`
-	DatabaseName string `json:"databaseName"`
-	TickerMinute int    `json:"tickerMinute"`
-	MaxWorkers   int    `json:"maxWorkers"`
-	Host         string `json:"host"`
-	Port         string `json:"port"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
-	Charset      string `json:"charset"`
-	TableName    string `json:"tableName"`
-	APIKey       string `json:"apiKey"`
-	APIBase      string `json:"apiBase"`
-	APIPath      string `json:"apiPath"`
-	Model        string `json:"model"`
+	TickerMinute       int    `json:"tickerMinute"`
+	MaxWorkers         int    `json:"maxWorkers"`
+	APIKey             string `json:"apiKey"`
+	APIBase            string `json:"apiBase"`
+	APIPath            string `json:"apiPath"`
+	Model              string `json:"model"`
+	AdminBaseURL       string `json:"adminBaseURL"`
+	AdminTimeoutSecond int    `json:"adminTimeoutSecond"`
 }
 
 func (p *CustomPlugin) getDefaultConfig() CustomConfig {
 	return CustomConfig{
-		DatabaseName: "custom",
-		Charset:      "utf8mb4",
-		TickerMinute: 600,
-		MaxWorkers:   20,
-		TableName:    "CustomKeywordRule",
-		Model:        "gpt-5",
-		APIBase:      "https://aiproxy.usw.sealos.io/v1",
-		APIPath:      "/chat/completions",
+		TickerMinute:       600,
+		MaxWorkers:         20,
+		AdminBaseURL:       config.DefaultAdminBaseURL,
+		AdminTimeoutSecond: config.DefaultAdminTimeoutSecond,
 	}
 }
 
@@ -118,79 +102,42 @@ func (p *CustomPlugin) loadConfig(setting string) error {
 		return err
 	}
 
-	if configFromJSON.Host == "" {
-		return errors.New("host configuration cannot be empty")
-	}
-	if configFromJSON.Port == "" {
-		return errors.New("port configuration cannot be empty")
-	}
-	if configFromJSON.Username == "" {
-		return errors.New("username configuration cannot be empty")
-	}
-	if configFromJSON.Password == "" {
-		return errors.New("password configuration cannot be empty")
-	}
-	if configFromJSON.APIKey == "" {
-		return errors.New("APIKey configuration cannot be empty")
-	}
-
-	p.customConfig.Host = configFromJSON.Host
-	p.customConfig.Port = configFromJSON.Port
-	p.customConfig.Username = configFromJSON.Username
-
-	// Support secure password from environment variable or encryption
-	if pwd, err := config.GetSecureValue(configFromJSON.Password); err == nil {
-		p.customConfig.Password = pwd
-		p.log.Debug("Using secure password from environment/encryption")
-	} else {
-		p.customConfig.Password = configFromJSON.Password
-		p.log.Warn("Using plain text password - consider using environment variables")
-	}
-
-	// Support secure API key from environment variable or encryption
-	if apiKey, err := config.GetSecureValue(configFromJSON.APIKey); err == nil {
-		p.customConfig.APIKey = apiKey
-		p.log.Debug("Using secure API key from environment/encryption")
-	} else {
-		p.customConfig.APIKey = configFromJSON.APIKey
-		p.log.Warn("Using plain text API key - consider using environment variables")
-	}
-
-	if configFromJSON.APIPath != "" {
-		p.customConfig.APIPath = configFromJSON.APIPath
-	}
-	if configFromJSON.APIBase != "" {
-		p.customConfig.APIBase = configFromJSON.APIBase
-	}
-	if configFromJSON.Dsn != "" {
-		p.customConfig.Dsn = configFromJSON.Dsn
-	}
-	if configFromJSON.DatabaseName != "" {
-		p.customConfig.DatabaseName = configFromJSON.DatabaseName
-	}
 	if configFromJSON.TickerMinute > 0 {
 		p.customConfig.TickerMinute = configFromJSON.TickerMinute
 	}
 	if configFromJSON.MaxWorkers > 0 {
 		p.customConfig.MaxWorkers = configFromJSON.MaxWorkers
 	}
-	if configFromJSON.Charset != "" {
-		p.customConfig.Charset = configFromJSON.Charset
+	if strings.TrimSpace(configFromJSON.AdminBaseURL) != "" {
+		if secureValue, err := config.GetSecureValue(configFromJSON.AdminBaseURL); err == nil {
+			p.customConfig.AdminBaseURL = secureValue
+		} else {
+			p.customConfig.AdminBaseURL = configFromJSON.AdminBaseURL
+		}
 	}
-	if configFromJSON.TableName != "" {
-		p.customConfig.TableName = configFromJSON.TableName
+	if configFromJSON.AdminTimeoutSecond > 0 {
+		p.customConfig.AdminTimeoutSecond = configFromJSON.AdminTimeoutSecond
 	}
-	if configFromJSON.Model != "" {
-		p.customConfig.Model = configFromJSON.Model
+	if err := p.applyModelRuntimeConfig(context.Background()); err != nil {
+		return fmt.Errorf("failed to apply model runtime config from admin: %w", err)
+	}
+	if strings.TrimSpace(p.customConfig.APIKey) == "" ||
+		strings.TrimSpace(p.customConfig.APIBase) == "" ||
+		strings.TrimSpace(p.customConfig.APIPath) == "" ||
+		strings.TrimSpace(p.customConfig.Model) == "" {
+		return errors.New("model_runtime config from admin is incomplete")
+	}
+	if err := p.readFromAdminConfigs(context.Background()); err != nil {
+		return fmt.Errorf("failed to load custom rules from admin: %w", err)
 	}
 
 	p.log.Info("Custom detector configuration loaded", logger.Fields{
-		"database":       p.customConfig.DatabaseName,
-		"table":          p.customConfig.TableName,
 		"api_base":       p.customConfig.APIBase,
 		"model":          p.customConfig.Model,
+		"admin_base_url": p.customConfig.AdminBaseURL,
 		"max_workers":    p.customConfig.MaxWorkers,
 		"ticker_minutes": p.customConfig.TickerMinute,
+		"keyword_count":  len(p.keywords),
 	})
 
 	return nil
@@ -211,13 +158,6 @@ func (p *CustomPlugin) Start(
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	p.log.Debug("Initializing database connection")
-	if err := p.initDB(); err != nil {
-		p.log.Error("Failed to initialize database", logger.Fields{
-			"error": err.Error(),
-		})
-		return fmt.Errorf("failed to initialize database: %w", err)
-	}
 	p.reviewer = utils.NewContentReviewer(
 		p.log,
 		p.customConfig.APIKey,
@@ -226,14 +166,7 @@ func (p *CustomPlugin) Start(
 		p.customConfig.Model,
 	)
 	p.log.Debug("Content reviewer initialized")
-	err = p.readFromDatabase(ctx)
-	if err != nil {
-		p.log.Error("Failed to read keywords from database", logger.Fields{
-			"error": err.Error(),
-		})
-		return err
-	}
-	p.log.Info("Keywords loaded from database", logger.Fields{
+	p.log.Info("Custom rules loaded", logger.Fields{
 		"keyword_count": len(p.keywords),
 	})
 	subscribe := eventBus.Subscribe(constants.CollectorTopic)
@@ -306,28 +239,16 @@ func (p *CustomPlugin) Start(
 				})
 			}(event)
 		case <-ticker.C:
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						p.log.Error("Panic in scheduled database read", logger.Fields{
-							"panic": r,
-						})
-					}
-				}()
-
-				p.log.Debug("Scheduled database read triggered")
-				err := p.readFromDatabase(ctx)
-				if err != nil {
-					p.log.Error("Failed to read keywords from database", logger.Fields{
-						"error": err.Error(),
-					})
-					return
-				}
-
-				p.log.Info("Keywords refreshed from database", logger.Fields{
-					"keyword_count": len(p.keywords),
+			p.log.Debug("Scheduled custom rules refresh triggered")
+			if err := p.refreshRules(ctx); err != nil {
+				p.log.Error("Failed to refresh custom rules from admin", logger.Fields{
+					"error": err.Error(),
 				})
-			}()
+				return err
+			}
+			p.log.Info("Keywords refreshed from admin configs", logger.Fields{
+				"keyword_count": len(p.keywords),
+			})
 		case <-ctx.Done():
 			p.log.Info("Shutting down custom detector plugin")
 			// Wait for all workers to finish
@@ -342,142 +263,141 @@ func (p *CustomPlugin) Start(
 
 func (p *CustomPlugin) Stop(ctx context.Context) error {
 	p.log.Info("Stopping custom detector plugin")
-
-	if p.db != nil {
-		sqlDB, err := p.db.DB()
-		if err == nil {
-			sqlDB.Close()
-			p.log.Debug("Database connection closed")
-		}
-	}
-
 	return nil
 }
 
-func (p *CustomPlugin) initDB() error {
-	p.log.Debug("Initializing database", logger.Fields{
-		"host":     p.customConfig.Host,
-		"port":     p.customConfig.Port,
-		"database": p.customConfig.DatabaseName,
-	})
-	serverDSN := p.buildDSN(false)
-	dbConfig := &gorm.Config{
-		Logger: gormLogger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			gormLogger.Config{
-				SlowThreshold: 3 * time.Second,  // Slow query threshold set to 3 seconds
-				LogLevel:      gormLogger.Error, // Show error logs only
-				Colorful:      false,            // Disable color output
-			},
-		),
-	}
-	db, err := gorm.Open(mysql.Open(serverDSN), dbConfig)
-	if err != nil {
-		return fmt.Errorf("failed to connect to MySQL server: %w", err)
-	}
-	err = db.Exec(
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET %s COLLATE %s_unicode_ci",
-			p.customConfig.DatabaseName,
-			p.customConfig.Charset,
-			p.customConfig.Charset),
-	).Error
-	if err != nil {
-		return fmt.Errorf("failed to create database: %w", err)
-	}
-	dbDSN := p.buildDSN(true)
-	db, err = gorm.Open(mysql.Open(dbDSN), dbConfig)
-	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-	p.db = db
-	tableName := db.NamingStrategy.TableName("CustomKeywordRule")
-
-	err = db.AutoMigrate(&utils.CustomKeywordRule{})
-	if err != nil {
-		return fmt.Errorf("failed to create table: %w", err)
-	}
-	var tableExists bool
-	err = db.Raw("SELECT COUNT(*) > 0 FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
-		p.customConfig.TableName, tableName).
-		Scan(&tableExists).
-		Error
-	if err != nil {
-		p.log.Warn("Failed to check table existence", logger.Fields{
-			"error": err.Error(),
-			"table": tableName,
-		})
-	}
-	var count int64
-	err = db.Model(&utils.CustomKeywordRule{}).Count(&count).Error
-	if err != nil {
-		return fmt.Errorf("failed to query data count: %w", err)
-	}
-	if count == 0 {
-		sampleRule := utils.CustomKeywordRule{
-			Type:        "malware",
-			Keywords:    strings.Join([]string{"virus", "trojan", "malware", "backdoor"}, ","),
-			Description: "Malware detection rule",
-		}
-		err = db.Create(&sampleRule).Error
-		if err != nil {
-			return fmt.Errorf("failed to insert sample data: %w", err)
-		}
-		var newCount int64
-		db.Model(&utils.CustomKeywordRule{}).Count(&newCount)
-
-		p.log.Info("Sample rule inserted", logger.Fields{
-			"rule_type":   "malware",
-			"total_rules": newCount,
-		})
-	}
-
-	p.log.Info("Database initialized successfully", logger.Fields{
-		"database":   p.customConfig.DatabaseName,
-		"table":      tableName,
-		"rule_count": count,
-	})
-
-	return nil
+func (p *CustomPlugin) refreshRules(ctx context.Context) error {
+	return p.readFromAdminConfigs(ctx)
 }
 
-func (p *CustomPlugin) buildDSN(includeDB bool) string {
-	if p.customConfig.Dsn != "" {
-		return p.customConfig.Dsn
-	}
-	dbPart := "/"
-	if includeDB {
-		dbPart = "/" + p.customConfig.DatabaseName
-	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)%s?charset=%s&parseTime=True&loc=Local",
-		p.customConfig.Username,
-		p.customConfig.Password,
-		p.customConfig.Host,
-		p.customConfig.Port,
-		dbPart,
-		p.customConfig.Charset,
+func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
+	cfgs, err := config.ListAdminProjectConfigsByType(
+		ctx,
+		p.customConfig.AdminBaseURL,
+		p.customConfig.AdminTimeoutSecond,
+		"custom",
 	)
-}
-
-func (p *CustomPlugin) readFromDatabase(ctx context.Context) error {
-	var models []utils.CustomKeywordRule
-
-	p.log.Debug("Reading keyword rules from database")
-	err := p.db.WithContext(ctx).Find(&models).Error
 	if err != nil {
-		p.log.Error("Failed to read keyword rules", logger.Fields{
-			"error": err.Error(),
-		})
 		return err
 	}
 
-	oldCount := len(p.keywords)
-	p.keywords = models
+	type ruleItem struct {
+		name string
+		rule utils.CustomKeywordRule
+	}
 
-	p.log.Debug("Keyword rules updated", logger.Fields{
-		"old_count": oldCount,
-		"new_count": len(models),
+	var rules []ruleItem
+	for _, cfg := range cfgs {
+		// Each custom config stores a free-form markdown snippet in config_value.content.
+		var payload struct {
+			Content string `json:"content"`
+		}
+		if err := cfg.DecodeValue(&payload); err != nil {
+			p.log.Warn("Failed to decode custom rule config_value", logger.Fields{
+				"config_name": cfg.ConfigName,
+				"error":       err.Error(),
+			})
+			continue
+		}
+		rule, parseErr := parseCustomRuleContent(payload.Content)
+		if parseErr != nil {
+			p.log.Warn("Failed to parse custom rule content", logger.Fields{
+				"config_name": cfg.ConfigName,
+				"error":       parseErr.Error(),
+			})
+			continue
+		}
+		rules = append(rules, ruleItem{name: cfg.ConfigName, rule: rule})
+	}
+	if len(rules) == 0 {
+		return errors.New("no valid custom rules found in admin configs")
+	}
+
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].name < rules[j].name
 	})
+	next := make([]utils.CustomKeywordRule, 0, len(rules))
+	for _, item := range rules {
+		next = append(next, item.rule)
+	}
+	p.keywords = next
+	return nil
+}
 
+func parseCustomRuleContent(content string) (utils.CustomKeywordRule, error) {
+	// Supported format:
+	// ### <type>
+	// - Description: <description>
+	// - Keywords: kw1, kw2, kw3
+	text := strings.TrimSpace(content)
+	if text == "" {
+		return utils.CustomKeywordRule{}, errors.New("content is empty")
+	}
+
+	lines := strings.Split(text, "\n")
+	var (
+		ruleType        string
+		ruleDescription string
+		ruleKeywords    string
+	)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "###"):
+			ruleType = strings.TrimSpace(strings.TrimPrefix(trimmed, "###"))
+		case strings.HasPrefix(trimmed, "- Description:"):
+			ruleDescription = strings.TrimSpace(strings.TrimPrefix(trimmed, "- Description:"))
+		case strings.HasPrefix(trimmed, "- Keywords:"):
+			ruleKeywords = strings.TrimSpace(strings.TrimPrefix(trimmed, "- Keywords:"))
+		}
+	}
+
+	if ruleType == "" {
+		return utils.CustomKeywordRule{}, errors.New("missing ### <type> header")
+	}
+	if ruleDescription == "" {
+		ruleDescription = ruleType + " detection rule"
+	}
+	if ruleKeywords == "" {
+		return utils.CustomKeywordRule{}, errors.New("missing - Keywords line")
+	}
+	return utils.CustomKeywordRule{
+		Type:        ruleType,
+		Description: ruleDescription,
+		Keywords:    ruleKeywords,
+	}, nil
+}
+
+func (p *CustomPlugin) applyModelRuntimeConfig(ctx context.Context) error {
+	// Reuse the same model runtime config as safety detector.
+	modelCfg, err := config.LoadModelRuntimeConfig(
+		ctx,
+		p.customConfig.AdminBaseURL,
+		p.customConfig.AdminTimeoutSecond,
+	)
+	if err != nil {
+		return err
+	}
+	if modelCfg == nil {
+		return errors.New("model_runtime config not found in admin")
+	}
+
+	if strings.TrimSpace(modelCfg.APIKey) != "" {
+		if secureValue, err := config.GetSecureValue(modelCfg.APIKey); err == nil {
+			p.customConfig.APIKey = secureValue
+		} else {
+			p.customConfig.APIKey = modelCfg.APIKey
+		}
+	}
+	if strings.TrimSpace(modelCfg.APIBase) != "" {
+		p.customConfig.APIBase = strings.TrimSpace(modelCfg.APIBase)
+	}
+	if strings.TrimSpace(modelCfg.APIPath) != "" {
+		p.customConfig.APIPath = strings.TrimSpace(modelCfg.APIPath)
+	}
+	if strings.TrimSpace(modelCfg.Model) != "" {
+		p.customConfig.Model = strings.TrimSpace(modelCfg.Model)
+	}
 	return nil
 }
 
@@ -512,7 +432,7 @@ func (p *CustomPlugin) customJudge(
 			Keywords:      []string{},
 		}, nil
 	}
-	result, err := p.reviewer.ReviewSiteContent(taskCtx, collector, p.Name(), p.keywords)
+	result, err := p.reviewer.ReviewSiteContent(taskCtx, collector, p.Name(), p.keywords, "")
 	if err != nil {
 		return &models.DetectorInfo{
 			DiscoveryName: collector.DiscoveryName,
