@@ -58,6 +58,7 @@ func (r *ContentReviewer) ReviewSiteContent(
 	content *models.CollectorInfo,
 	name string,
 	customRules []CustomKeywordRule,
+	safetyRulesPrompt string,
 ) (*models.DetectorInfo, error) {
 	if content == nil {
 		r.log.Error("Review called with nil content")
@@ -67,9 +68,10 @@ func (r *ContentReviewer) ReviewSiteContent(
 	r.log.Debug("Preparing review request", logger.Fields{
 		"host":             content.Host,
 		"has_custom_rules": len(customRules) > 0,
+		"has_safety_rules": strings.TrimSpace(safetyRulesPrompt) != "",
 	})
 
-	requestData, err := r.prepareRequestData(content, customRules)
+	requestData, err := r.prepareRequestData(content, customRules, safetyRulesPrompt)
 	if err != nil {
 		r.log.Error("Failed to prepare request data", logger.Fields{
 			"error": err.Error(),
@@ -114,6 +116,7 @@ func (r *ContentReviewer) ReviewSiteContent(
 func (r *ContentReviewer) prepareRequestData(
 	content *models.CollectorInfo,
 	customRules []CustomKeywordRule,
+	safetyRulesPrompt string,
 ) (map[string]any, error) {
 	base64Image := base64.StdEncoding.EncodeToString(content.Screenshot)
 	htmlContent := content.HTML
@@ -126,10 +129,13 @@ func (r *ContentReviewer) prepareRequestData(
 		})
 	}
 	var prompt string
-	if customRules == nil || len(customRules) == 0 {
-		prompt = r.buildPrompt(htmlContent)
-	} else {
+	switch {
+	case customRules != nil && len(customRules) > 0:
 		prompt = r.buildCustomPrompt(htmlContent, customRules)
+	case strings.TrimSpace(safetyRulesPrompt) != "":
+		prompt = r.buildSafetyPromptFromRules(htmlContent, safetyRulesPrompt)
+	default:
+		prompt = r.buildPrompt(htmlContent)
 	}
 	requestData := map[string]any{
 		"model": r.model,
@@ -154,6 +160,41 @@ func (r *ContentReviewer) prepareRequestData(
 		"response_format":       ReviewResultSchema,
 	}
 	return requestData, nil
+}
+
+func (r *ContentReviewer) buildSafetyPromptFromRules(
+	htmlContent string,
+	safetyRulesPrompt string,
+) string {
+	htmlBlock := "```html\n" + htmlContent + "\n```"
+	return fmt.Sprintf(`# Role: Content Analysis and Compliance Checker
+
+# Goal:
+1. Provide a brief one-sentence description of the webpage content or purpose.
+2. Extract up to 5 keywords relevant to the webpage.
+3. Determine whether the webpage contains illegal or non-compliant content according to the merged safety rules below.
+
+# Safety Rules (Merged by config_name):
+%s
+
+# Important Notes:
+I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code.
+If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+
+# HTML Code Excerpt:
+%s
+
+# Output:
+Please output strictly in the following JSON format without any additional explanation or text:
+
+{
+  "description": "<Generated webpage description>",
+  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "compliance": {
+    "is_illegal": "<Yes/No>",
+    "explanation": "<Brief explanation listing specific violated categories and evidence>"
+  }
+}`, strings.TrimSpace(safetyRulesPrompt), htmlBlock)
 }
 
 func (r *ContentReviewer) buildPrompt(htmlContent string) string {
