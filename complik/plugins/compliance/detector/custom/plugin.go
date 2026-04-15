@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -288,7 +289,7 @@ func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
 
 	var rules []ruleItem
 	for _, cfg := range cfgs {
-		// Each custom config stores a free-form markdown snippet in config_value.content.
+		// Each custom config stores free-form text in config_value.content.
 		var payload struct {
 			Content string `json:"content"`
 		}
@@ -299,7 +300,7 @@ func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
 			})
 			continue
 		}
-		rule, parseErr := parseCustomRuleContent(payload.Content)
+		rule, parseErr := parseCustomRuleContent(cfg.ConfigName, payload.Content)
 		if parseErr != nil {
 			p.log.Warn("Failed to parse custom rule content", logger.Fields{
 				"config_name": cfg.ConfigName,
@@ -324,11 +325,7 @@ func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
 	return nil
 }
 
-func parseCustomRuleContent(content string) (utils.CustomKeywordRule, error) {
-	// Supported format:
-	// ### <type>
-	// - Description: <description>
-	// - Keywords: kw1, kw2, kw3
+func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule, error) {
 	text := strings.TrimSpace(content)
 	if text == "" {
 		return utils.CustomKeywordRule{}, errors.New("content is empty")
@@ -338,34 +335,169 @@ func parseCustomRuleContent(content string) (utils.CustomKeywordRule, error) {
 	var (
 		ruleType        string
 		ruleDescription string
-		ruleKeywords    string
+		keywordSegments []string
+		unlabeledLines  []string
 	)
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
 		switch {
 		case strings.HasPrefix(trimmed, "###"):
 			ruleType = strings.TrimSpace(strings.TrimPrefix(trimmed, "###"))
-		case strings.HasPrefix(trimmed, "- Description:"):
-			ruleDescription = strings.TrimSpace(strings.TrimPrefix(trimmed, "- Description:"))
-		case strings.HasPrefix(trimmed, "- Keywords:"):
-			ruleKeywords = strings.TrimSpace(strings.TrimPrefix(trimmed, "- Keywords:"))
+			continue
 		}
+
+		key, value, ok := parseRuleKeyValue(trimmed)
+		if ok {
+			switch normalizeRuleKey(key) {
+			case "type", "rule", "category", "类型", "规则", "分类":
+				if value != "" {
+					ruleType = value
+				}
+				continue
+			case "description", "desc", "说明", "描述":
+				if value != "" {
+					ruleDescription = value
+				}
+				continue
+			case "keywords", "keyword", "keywordslist", "关键词", "关键字", "违禁词", "违规词":
+				if value != "" {
+					keywordSegments = append(keywordSegments, value)
+				}
+				continue
+			}
+		}
+		unlabeledLines = append(unlabeledLines, trimmed)
+	}
+
+	if ruleType == "" && len(unlabeledLines) > 1 && looksLikeRuleType(unlabeledLines[0]) {
+		ruleType = unlabeledLines[0]
+		unlabeledLines = unlabeledLines[1:]
+	}
+	if len(keywordSegments) == 0 && len(unlabeledLines) > 0 {
+		keywordSegments = append(keywordSegments, strings.Join(unlabeledLines, "\n"))
+	}
+
+	keywords := splitRuleKeywords(strings.Join(keywordSegments, "\n"))
+	if len(keywords) == 0 {
+		return utils.CustomKeywordRule{}, errors.New("keywords not found in content")
 	}
 
 	if ruleType == "" {
-		return utils.CustomKeywordRule{}, errors.New("missing ### <type> header")
+		ruleType = deriveRuleTypeFromConfigName(configName)
+	}
+	ruleType = strings.TrimSpace(ruleType)
+	if ruleType == "" {
+		ruleType = "custom"
 	}
 	if ruleDescription == "" {
-		ruleDescription = ruleType + " detection rule"
+		ruleDescription = fmt.Sprintf("%s关键词检测规则", ruleType)
 	}
-	if ruleKeywords == "" {
-		return utils.CustomKeywordRule{}, errors.New("missing - Keywords line")
-	}
+
 	return utils.CustomKeywordRule{
 		Type:        ruleType,
 		Description: ruleDescription,
-		Keywords:    ruleKeywords,
+		Keywords:    strings.Join(keywords, ", "),
 	}, nil
+}
+
+func parseRuleKeyValue(line string) (key string, value string, ok bool) {
+	cleaned := strings.TrimSpace(line)
+	cleaned = strings.TrimLeft(cleaned, "-*• ")
+	if cleaned == "" {
+		return "", "", false
+	}
+	for _, sep := range []string{":", "："} {
+		if idx := strings.Index(cleaned, sep); idx > 0 {
+			key = strings.TrimSpace(cleaned[:idx])
+			value = strings.TrimSpace(cleaned[idx+len(sep):])
+			if key == "" {
+				return "", "", false
+			}
+			return key, value, true
+		}
+	}
+	return "", "", false
+}
+
+func normalizeRuleKey(key string) string {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	replacer := strings.NewReplacer("-", "", "_", "", " ", "")
+	return replacer.Replace(normalized)
+}
+
+func looksLikeRuleType(line string) bool {
+	candidate := strings.TrimSpace(line)
+	if candidate == "" {
+		return false
+	}
+	if strings.ContainsAny(candidate, ",，;；|") {
+		return false
+	}
+	return utf8RuneCount(candidate) <= 32
+}
+
+func deriveRuleTypeFromConfigName(configName string) string {
+	name := strings.TrimSpace(configName)
+	if name == "" {
+		return "custom"
+	}
+	for _, sep := range []string{"/", ":"} {
+		if parts := strings.Split(name, sep); len(parts) > 0 {
+			name = parts[len(parts)-1]
+		}
+	}
+	if parts := strings.Split(name, "."); len(parts) > 0 {
+		name = parts[len(parts)-1]
+	}
+	name = strings.TrimSpace(name)
+	name = regexp.MustCompile(`(?i)[_-]v\d+$`).ReplaceAllString(name, "")
+	name = regexp.MustCompile(`^\d+[_-]?`).ReplaceAllString(name, "")
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "custom"
+	}
+	return name
+}
+
+func splitRuleKeywords(raw string) []string {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return nil
+	}
+	normalized := strings.NewReplacer(
+		"，", ",",
+		"、", ",",
+		"；", ",",
+		";", ",",
+		"|", ",",
+		"\r", "\n",
+	).Replace(text)
+	parts := regexp.MustCompile(`[,\n]+`).Split(normalized, -1)
+	if len(parts) == 1 && strings.Contains(normalized, ".") {
+		parts = strings.Split(normalized, ".")
+	}
+	seen := make(map[string]struct{}, len(parts))
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		kw := strings.TrimSpace(strings.Trim(part, `"'`))
+		if kw == "" {
+			continue
+		}
+		key := strings.ToLower(kw)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, kw)
+	}
+	return result
+}
+
+func utf8RuneCount(s string) int {
+	return len([]rune(s))
 }
 
 func (p *CustomPlugin) applyModelRuntimeConfig(ctx context.Context) error {

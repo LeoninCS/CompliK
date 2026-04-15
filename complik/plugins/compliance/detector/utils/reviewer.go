@@ -247,22 +247,34 @@ Please output strictly in the following JSON format without any additional expla
 func (r *ContentReviewer) buildRulesDescription(rules []CustomKeywordRule) string {
 	var builder strings.Builder
 	for _, rule := range rules {
-		keywords := strings.Split(rule.Keywords, ".")
-		for j, keyword := range keywords {
+		keywords := strings.FieldsFunc(rule.Keywords, func(r rune) bool {
+			switch r {
+			case '.', ',', '，', '、', ';', '；', '\n', '\r':
+				return true
+			default:
+				return false
+			}
+		})
+		cleanedKeywords := make([]string, 0, len(keywords))
+		for _, keyword := range keywords {
 			trimmed := strings.TrimSpace(keyword)
-			keywords[j] = trimmed
+			if trimmed != "" {
+				cleanedKeywords = append(cleanedKeywords, trimmed)
+			}
 		}
-
-		ruleText := fmt.Sprintf(`
-### %s
-- Description: %s
-- Keywords: %s
-`, rule.Type, rule.Description, strings.Join(keywords, ", "))
-
+		ruleType := strings.TrimSpace(rule.Type)
+		if ruleType == "" {
+			ruleType = "custom"
+		}
+		description := strings.TrimSpace(rule.Description)
+		if description == "" {
+			description = ruleType + "关键词检测规则"
+		}
+		ruleText := fmt.Sprintf("类型: %s\n说明: %s\n关键词: %s\n", ruleType, description, strings.Join(cleanedKeywords, ", "))
 		builder.WriteString(ruleText)
+		builder.WriteString("\n")
 	}
-	result := builder.String()
-	return result
+	return strings.TrimSpace(builder.String())
 }
 
 func (r *ContentReviewer) buildCustomPrompt(
