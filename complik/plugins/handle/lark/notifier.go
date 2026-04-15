@@ -103,54 +103,54 @@ func (f *Notifier) buildWhitelistMessage(
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Resource Information**",
+				"content": "**资源信息**",
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Region:** " + results.Region,
+				"content": "**区域：** " + results.Region,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Resource Name:** " + results.Name,
+				"content": "**资源名称：** " + results.Name,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Namespace:** " + results.Namespace,
+				"content": "**命名空间：** " + results.Namespace,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Host Address:** " + results.Host,
+				"content": "**主机地址：** " + results.Host,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Full URL:** " + results.URL,
+				"content": "**完整 URL：** " + results.URL,
 				"tag":     "lark_md",
 			},
 		},
 	}
 
 	if len(results.Path) > 0 {
-		pathContent := "**Detection Paths:**\n"
+		pathContent := "**检测路径：**\n"
 		for i, path := range results.Path {
 			if i < 5 {
 				pathContent += fmt.Sprintf("  • %s\n", path)
 			} else if i == 5 {
-				pathContent += fmt.Sprintf("  • ... %d more paths\n", len(results.Path)-5)
+				pathContent += fmt.Sprintf("  • ... 其余 %d 条路径\n", len(results.Path)-5)
 				break
 			}
 		}
@@ -171,14 +171,14 @@ func (f *Notifier) buildWhitelistMessage(
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Whitelist Information**",
+				"content": "**白名单信息**",
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Whitelist Status:** Added to whitelist",
+				"content": "**白名单状态：** 已加入白名单",
 				"tag":     "lark_md",
 			},
 		},
@@ -191,32 +191,32 @@ func (f *Notifier) buildWhitelistMessage(
 
 		switch whitelistInfo.Type {
 		case whitelist.WhitelistTypeNamespace:
-			whitelistTypeText = "Namespace Whitelist"
-			validityText = "Permanent"
+			whitelistTypeText = "命名空间白名单"
+			validityText = "永久"
 		case whitelist.WhitelistTypeHost:
-			whitelistTypeText = "Host Whitelist"
-			validityText = "Expires"
+			whitelistTypeText = "主机白名单"
+			validityText = "到期"
 		}
 
 		whitelistElements = append(whitelistElements,
 			map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Whitelist Type:** " + whitelistTypeText,
+					"content": "**白名单类型：** " + whitelistTypeText,
 					"tag":     "lark_md",
 				},
 			},
 			map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Validity:** " + validityText,
+					"content": "**有效期：** " + validityText,
 					"tag":     "lark_md",
 				},
 			},
 			map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Created At:** " + whitelistInfo.CreatedAt.Format(time.DateTime),
+					"content": "**创建时间：** " + whitelistInfo.CreatedAt.Format(time.DateTime),
 					"tag":     "lark_md",
 				},
 			},
@@ -227,7 +227,7 @@ func (f *Notifier) buildWhitelistMessage(
 			whitelistElements = append(whitelistElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": fmt.Sprintf("**Match Rule:** Namespace `%s`", whitelistInfo.Namespace),
+					"content": fmt.Sprintf("**匹配规则：** 命名空间 `%s`", whitelistInfo.Namespace),
 					"tag":     "lark_md",
 				},
 			})
@@ -235,7 +235,7 @@ func (f *Notifier) buildWhitelistMessage(
 			whitelistElements = append(whitelistElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": fmt.Sprintf("**Match Rule:** Host `%s`", whitelistInfo.Hostname),
+					"content": fmt.Sprintf("**匹配规则：** 主机 `%s`", whitelistInfo.Hostname),
 					"tag":     "lark_md",
 				},
 			})
@@ -246,7 +246,7 @@ func (f *Notifier) buildWhitelistMessage(
 			whitelistElements = append(whitelistElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Remark:** " + whitelistInfo.Remark,
+					"content": "**备注：** " + whitelistInfo.Remark,
 					"tag":     "lark_md",
 				},
 			})
@@ -259,7 +259,7 @@ func (f *Notifier) buildWhitelistMessage(
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Detected Content**",
+				"content": "**检测内容**",
 				"tag":     "lark_md",
 			},
 		},
@@ -269,14 +269,14 @@ func (f *Notifier) buildWhitelistMessage(
 		detectionElements = append(detectionElements, map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Description:** " + results.Description,
+				"content": "**描述：** " + results.Description,
 				"tag":     "lark_md",
 			},
 		})
 	}
 
 	if len(results.Keywords) > 0 {
-		keywordContent := "**Keywords:** "
+		keywordContent := "**关键词：** "
 		for i, keyword := range results.Keywords {
 			if i > 0 {
 				keywordContent += ", "
@@ -296,7 +296,7 @@ func (f *Notifier) buildWhitelistMessage(
 		detectionElements = append(detectionElements, map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Detection Evidence:** " + results.Explanation,
+				"content": "**检测证据：** " + results.Explanation,
 				"tag":     "lark_md",
 			},
 		})
@@ -312,14 +312,14 @@ func (f *Notifier) buildWhitelistMessage(
 		map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Detection Time:** " + time.Now().Format(time.DateTime),
+				"content": "**检测时间：** " + time.Now().Format(time.DateTime),
 				"tag":     "lark_md",
 			},
 		},
 		map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**This resource is in the whitelist, detection result has been ignored**",
+				"content": "**该资源在白名单中，检测结果已忽略**",
 				"tag":     "lark_md",
 			},
 		},
@@ -332,7 +332,7 @@ func (f *Notifier) buildWhitelistMessage(
 		"header": map[string]any{
 			"template": "green",
 			"title": map[string]any{
-				"content": "Whitelisted Resource Detection Notice",
+				"content": "白名单资源检测通知",
 				"tag":     "plain_text",
 			},
 		},
@@ -345,47 +345,47 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Region:** " + results.Region,
+				"content": "**区域：** " + results.Region,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Resource Name:** " + results.Name,
+				"content": "**资源名称：** " + results.Name,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Namespace:** " + results.Namespace,
+				"content": "**命名空间：** " + results.Namespace,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Host Address:** " + results.Host,
+				"content": "**主机地址：** " + results.Host,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Full URL:** " + results.URL,
+				"content": "**完整 URL：** " + results.URL,
 				"tag":     "lark_md",
 			},
 		},
 	}
 
 	if len(results.Path) > 0 {
-		pathContent := "**Detection Paths:**\n"
+		pathContent := "**检测路径：**\n"
 		for i, path := range results.Path {
 			if i < 5 {
 				pathContent += fmt.Sprintf("  • %s\n", path)
 			} else if i == 5 {
-				pathContent += fmt.Sprintf("  • ... %d more paths\n", len(results.Path)-5)
+				pathContent += fmt.Sprintf("  • ... 其余 %d 条路径\n", len(results.Path)-5)
 				break
 			}
 		}
@@ -412,7 +412,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 			{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Violation Details**",
+					"content": "**违规详情**",
 					"tag":     "lark_md",
 				},
 			},
@@ -422,13 +422,13 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 			violationElements = append(violationElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Description:** " + results.Description,
+					"content": "**描述：** " + results.Description,
 					"tag":     "lark_md",
 				},
 			})
 		}
 		if len(results.Keywords) > 0 {
-			keywordContent := "**Matched Keywords:** "
+			keywordContent := "**命中关键词：** "
 			for i, keyword := range results.Keywords {
 				if i > 0 {
 					keywordContent += ", "
@@ -448,7 +448,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 			violationElements = append(violationElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Violation Evidence:** " + results.Explanation,
+					"content": "**违规证据：** " + results.Explanation,
 					"tag":     "lark_md",
 				},
 			})
@@ -465,7 +465,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Detection Time:** " + time.Now().Format(time.DateTime),
+				"content": "**检测时间：** " + time.Now().Format(time.DateTime),
 				"tag":     "lark_md",
 			},
 		},
@@ -476,17 +476,17 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		elements = append(elements, map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Please handle the violation content promptly!**",
+				"content": "**请及时处理违规内容！**",
 				"tag":     "lark_md",
 			},
 		})
 	}
 
 	template := "green"
-	title := "Website Content Detection Notice"
+	title := "网站内容检测通知"
 	if results.IsIllegal {
 		template = "red"
-		title = "Website Content Violation Alert"
+		title = "网站内容违规告警"
 	}
 
 	return map[string]any{

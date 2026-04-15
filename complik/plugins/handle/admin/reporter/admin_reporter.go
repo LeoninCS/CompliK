@@ -49,6 +49,21 @@ type complikViolationRequest struct {
 	RawPayload    any       `json:"raw_payload,omitempty"`
 }
 
+type localizedRawPayload struct {
+	URL       string   `json:"链接,omitempty"`
+	Host      string   `json:"主机,omitempty"`
+	Name      string   `json:"资源名称,omitempty"`
+	Path      []string `json:"路径,omitempty"`
+	Region    string   `json:"区域,omitempty"`
+	Keywords  []string `json:"关键词,omitempty"`
+	Namespace string   `json:"命名空间,omitempty"`
+	IsIllegal bool     `json:"是否违规"`
+	Desc      string   `json:"描述,omitempty"`
+	Detector  string   `json:"检测器,omitempty"`
+	Collector string   `json:"采集器,omitempty"`
+	Discovery string   `json:"发现器,omitempty"`
+}
+
 func (p *AdminReporterPlugin) reportViolation(result *models.DetectorInfo) error {
 	if result == nil {
 		return fmt.Errorf("detector result is nil")
@@ -77,7 +92,20 @@ func (p *AdminReporterPlugin) reportViolation(result *models.DetectorInfo) error
 		IsTest:        isComplikTestEvent(result),
 		Status:        "open",
 		DetectedAt:    time.Now().UTC(),
-		RawPayload:    result,
+		RawPayload: localizedRawPayload{
+			URL:       result.URL,
+			Host:      result.Host,
+			Name:      result.Name,
+			Path:      result.Path,
+			Region:    result.Region,
+			Keywords:  result.Keywords,
+			Namespace: result.Namespace,
+			IsIllegal: result.IsIllegal,
+			Desc:      result.Description,
+			Detector:  result.DetectorName,
+			Collector: result.CollectorName,
+			Discovery: result.DiscoveryName,
+		},
 	}
 
 	return postJSON(ctx, p.adminEndpoint(), requestBody)
@@ -98,11 +126,11 @@ func isComplikTestEvent(result *models.DetectorInfo) bool {
 	if result == nil {
 		return false
 	}
-	if strings.EqualFold(result.Name, "Program started, Feishu notification test") {
+	if strings.EqualFold(result.Name, "程序启动，飞书通知测试") {
 		return true
 	}
 	for _, keyword := range result.Keywords {
-		if keyword == "program_start" {
+		if keyword == "程序启动" {
 			return true
 		}
 	}
