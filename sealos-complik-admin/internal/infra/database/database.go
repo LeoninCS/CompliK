@@ -23,7 +23,7 @@ func Init(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	if client != nil {
 		return client, nil
 	}
-	// varify config before trying to connect to avoid unnecessary connection attempts with invalid config
+	// verify config before trying to connect to avoid unnecessary connection attempts with invalid config
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
