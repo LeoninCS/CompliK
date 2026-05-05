@@ -293,6 +293,10 @@ function buildNamespaceProfiles(
   return profiles.sort((a, b) => a.namespace.localeCompare(b.namespace));
 }
 
+function getErrorMessage(err: unknown) {
+  return err instanceof Error ? err.message : "加载数据失败";
+}
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -305,22 +309,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    const loadErrors: string[] = [];
 
-    const safeLoad = async <T,>(loader: () => Promise<T>, fallback: T) => {
+    const safeLoad = async <T,>(label: string, loader: () => Promise<T>, fallback: T) => {
       try {
         return await loader();
       } catch (err) {
+        loadErrors.push(`${label}: ${getErrorMessage(err)}`);
         return fallback;
       }
     };
 
     try {
       const [configs, commitments, bans, unbans, violationList] = await Promise.all([
-        safeLoad(listConfigRecords, [] as ConfigRecord[]),
-        safeLoad(listCommitmentRecords, [] as CommitmentRecord[]),
-        safeLoad(listBanRecords, [] as BanRecord[]),
-        safeLoad(listUnbanRecords, [] as UnbanRecord[]),
-        safeLoad(listViolationRecords, [] as ViolationRecord[]),
+        safeLoad("配置记录", listConfigRecords, [] as ConfigRecord[]),
+        safeLoad("承诺书记录", listCommitmentRecords, [] as CommitmentRecord[]),
+        safeLoad("封禁记录", listBanRecords, [] as BanRecord[]),
+        safeLoad("解封记录", listUnbanRecords, [] as UnbanRecord[]),
+        safeLoad("违规记录", listViolationRecords, [] as ViolationRecord[]),
       ]);
 
       setConfigRecords(configs);
@@ -328,8 +334,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setBanRecords(bans);
       setUnbanRecords(unbans);
       setViolations(violationList);
+      if (loadErrors.length > 0) {
+        setError(loadErrors.join("；"));
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载数据失败");
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
