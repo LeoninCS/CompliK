@@ -4,4 +4,6 @@ configs/config.env.yaml
 .DS_Store
 web/node_modules/
 web/dist/
+web/*.tsbuildinfo
+web/vite.config.d.ts
 chore/
