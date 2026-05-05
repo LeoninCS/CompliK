@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
   ConfirmModal,
@@ -19,10 +19,11 @@ import type { UnbanRecord } from "../types";
 
 export function UnbansPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { banRecords, configRecords, createUnbanRecord, unbanRecords, deleteUnbanRecord } = useAppData();
   const [selected, setSelected] = useState<UnbanRecord | null>(null);
   const [open, setOpen] = useState(false);
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(() => searchParams.get("namespace") ?? "");
   const [operatorFilter, setOperatorFilter] = useState("");
   const [pendingDelete, setPendingDelete] = useState<UnbanRecord | null>(null);
   const [namespace, setNamespace] = useState("");
@@ -34,6 +35,10 @@ export function UnbansPage() {
     ...banRecords.map((item) => item.operatorName),
     ...unbanRecords.map((item) => item.operatorName),
   ]);
+
+  useEffect(() => {
+    setKeyword(searchParams.get("namespace") ?? "");
+  }, [searchParams]);
 
   const rows = useMemo(() => {
     return unbanRecords.filter((item) => {

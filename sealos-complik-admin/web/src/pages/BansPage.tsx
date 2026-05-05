@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
   ConfirmModal,
@@ -22,10 +22,11 @@ import type { BanRecord } from "../types";
 
 export function BansPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { banRecords, configRecords, createBanRecord, deleteBanRecord, unbanRecords } = useAppData();
   const [selected, setSelected] = useState<BanRecord | null>(null);
   const [open, setOpen] = useState(false);
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(() => searchParams.get("namespace") ?? "");
   const [operatorFilter, setOperatorFilter] = useState("");
   const [pendingDelete, setPendingDelete] = useState<BanRecord | null>(null);
   const [namespace, setNamespace] = useState("");
@@ -64,6 +65,10 @@ export function BansPage() {
       screenshotPreviews.forEach((item) => URL.revokeObjectURL(item.url));
     };
   }, [screenshotPreviews]);
+
+  useEffect(() => {
+    setKeyword(searchParams.get("namespace") ?? "");
+  }, [searchParams]);
 
   const appendScreenshots = (files: File[]) => {
     if (files.length === 0) {

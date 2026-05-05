@@ -1,6 +1,6 @@
 import { ArrowRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { createSearchParams, useNavigate, useParams } from "react-router-dom";
 import {
   Button,
   ConfirmModal,
@@ -75,10 +75,26 @@ export function NamespaceDetailPage() {
         description="先判断违规记录、封禁和承诺书情况，再回看最近违规和处置时间线。"
         actions={
           <>
-            <Button variant="secondary" onClick={() => navigate(`/bans?namespace=${profile.namespace}`)}>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate({
+                  pathname: "/bans",
+                  search: `?${createSearchParams({ namespace: profile.namespace }).toString()}`,
+                })
+              }
+            >
               去封禁记录
             </Button>
-            <Button variant="secondary" onClick={() => navigate(`/unbans?namespace=${profile.namespace}`)}>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate({
+                  pathname: "/unbans",
+                  search: `?${createSearchParams({ namespace: profile.namespace }).toString()}`,
+                })
+              }
+            >
               去解封记录
             </Button>
           </>
