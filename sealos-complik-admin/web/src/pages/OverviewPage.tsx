@@ -5,7 +5,7 @@ import { Button, PageHeader, StatusPill, SurfaceCard } from "../components/ui";
 
 export function OverviewPage() {
   const navigate = useNavigate();
-  const { latestActions, latestViolations, quickLinks, stats } = useAppData();
+  const { latestActions, latestViolations, quickLinks, refreshAll, stats } = useAppData();
 
   return (
     <div className="page-container">
@@ -13,7 +13,11 @@ export function OverviewPage() {
         kicker="Overview"
         title="合规总览"
         description="先看风险数量和最近动态，再进入具体 namespace 或记录页处理。"
-        actions={<Button variant="secondary"> <RefreshCw size={16} /> 刷新 </Button>}
+        actions={
+          <Button variant="secondary" onClick={() => void refreshAll()}>
+            <RefreshCw size={16} /> 刷新
+          </Button>
+        }
       />
 
       <section className="stat-grid">
