@@ -23,9 +23,14 @@ func (r *Repository) CreateBan(ctx context.Context, ban *Ban) error {
 // GetBansByNamespace returns all ban records for the given namespace.
 func (r *Repository) GetBansByNamespace(ctx context.Context, namespace string) ([]Ban, error) {
 	var bans []Ban
-	if err := r.db.WithContext(ctx).Where("namespace = ?", namespace).Order("ban_start_time DESC, id DESC").Find(&bans).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("namespace = ?", namespace).
+		Order("ban_start_time DESC, id DESC").
+		Find(&bans).
+		Error; err != nil {
 		return nil, err
 	}
+
 	if len(bans) == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
@@ -36,7 +41,10 @@ func (r *Repository) GetBansByNamespace(ctx context.Context, namespace string) (
 // ListBans returns all ban records.
 func (r *Repository) ListBans(ctx context.Context) ([]Ban, error) {
 	var bans []Ban
-	if err := r.db.WithContext(ctx).Order("ban_start_time DESC, id DESC").Find(&bans).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Order("ban_start_time DESC, id DESC").
+		Find(&bans).
+		Error; err != nil {
 		return nil, err
 	}
 
@@ -49,6 +57,7 @@ func (r *Repository) DeleteBanByID(ctx context.Context, id uint64) error {
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
@@ -57,7 +66,11 @@ func (r *Repository) DeleteBanByID(ctx context.Context, id uint64) error {
 }
 
 // HasActiveBan reports whether the given namespace currently has any active ban records.
-func (r *Repository) HasActiveBan(ctx context.Context, namespace string, now time.Time) (bool, error) {
+func (r *Repository) HasActiveBan(
+	ctx context.Context,
+	namespace string,
+	now time.Time,
+) (bool, error) {
 	var count int64
 	if err := r.db.WithContext(ctx).
 		Model(&Ban{}).

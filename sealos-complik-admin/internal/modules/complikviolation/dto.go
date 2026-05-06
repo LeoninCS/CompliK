@@ -14,21 +14,21 @@ type ViolationIDRequest struct {
 }
 
 type CreateViolationRequest struct {
-	Namespace     string          `json:"namespace" binding:"required,max=255"`
-	Region        string          `json:"region" binding:"omitempty,max=64"`
+	Namespace     string          `json:"namespace"      binding:"required,max=255"`
+	Region        string          `json:"region"         binding:"omitempty,max=64"`
 	DiscoveryName string          `json:"discovery_name" binding:"omitempty,max=255"`
 	CollectorName string          `json:"collector_name" binding:"omitempty,max=255"`
-	DetectorName  string          `json:"detector_name" binding:"required,max=64"`
-	ResourceName  string          `json:"resource_name" binding:"omitempty,max=255"`
-	Host          string          `json:"host" binding:"omitempty,max=255"`
-	URL           string          `json:"url" binding:"omitempty,max=1024"`
+	DetectorName  string          `json:"detector_name"  binding:"required,max=64"`
+	ResourceName  string          `json:"resource_name"  binding:"omitempty,max=255"`
+	Host          string          `json:"host"           binding:"omitempty,max=255"`
+	URL           string          `json:"url"            binding:"omitempty,max=1024"`
 	Path          []string        `json:"path"`
 	Keywords      []string        `json:"keywords"`
-	Description   string          `json:"description" binding:"omitempty"`
-	Explanation   string          `json:"explanation" binding:"omitempty"`
+	Description   string          `json:"description"    binding:"omitempty"`
+	Explanation   string          `json:"explanation"    binding:"omitempty"`
 	IsIllegal     *bool           `json:"is_illegal"`
 	IsTest        bool            `json:"is_test"`
-	DetectedAt    time.Time       `json:"detected_at" binding:"required"`
+	DetectedAt    time.Time       `json:"detected_at"    binding:"required"`
 	RawPayload    json.RawMessage `json:"raw_payload"`
 }
 

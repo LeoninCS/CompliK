@@ -1,9 +1,8 @@
 package procscanviolation
 
 import (
-	"sealos-complik-admin/internal/infra/database"
-
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/infra/database"
 )
 
 func InitRoutes(g *gin.Engine) {

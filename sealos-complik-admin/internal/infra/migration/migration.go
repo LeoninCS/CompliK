@@ -1,22 +1,22 @@
 package migration
 
 import (
+	"errors"
 	"fmt"
 
+	"gorm.io/gorm"
 	"sealos-complik-admin/internal/modules/ban"
 	"sealos-complik-admin/internal/modules/commitment"
 	"sealos-complik-admin/internal/modules/complikviolation"
 	"sealos-complik-admin/internal/modules/procscanviolation"
 	"sealos-complik-admin/internal/modules/projectconfig"
 	"sealos-complik-admin/internal/modules/unban"
-
-	"gorm.io/gorm"
 )
 
 // AutoMigrate runs all module migrations in one place.
 func AutoMigrate(db *gorm.DB) error {
 	if db == nil {
-		return fmt.Errorf("migration automigrate: database is nil")
+		return errors.New("migration automigrate: database is nil")
 	}
 
 	migrations := []struct {

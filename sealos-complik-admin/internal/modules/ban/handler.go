@@ -2,7 +2,6 @@ package ban
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -40,6 +39,7 @@ func (h *Handler) CreateBan(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -61,6 +61,7 @@ func (h *Handler) UploadBan(c *gin.Context) {
 			"message": "invalid form data",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -70,6 +71,7 @@ func (h *Handler) UploadBan(c *gin.Context) {
 			"message": "invalid ban start time",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -79,6 +81,7 @@ func (h *Handler) UploadBan(c *gin.Context) {
 			"message": "invalid screenshot files",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -106,6 +109,7 @@ func (h *Handler) DeleteBanByID(c *gin.Context) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -154,6 +158,7 @@ func (h *Handler) PreviewScreenshot(c *gin.Context) {
 			"message": "invalid request query",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -162,13 +167,15 @@ func (h *Handler) PreviewScreenshot(c *gin.Context) {
 		h.respondWithServiceError(c, err, "failed to preview ban screenshot")
 		return
 	}
+
 	defer func() {
 		_ = file.Reader.Close()
 	}()
 
 	c.Header("Content-Type", file.ContentType)
-	c.Header("Content-Disposition", fmt.Sprintf("inline; filename*=UTF-8''%s", url.QueryEscape(file.FileName)))
+	c.Header("Content-Disposition", "inline; filename*=UTF-8''"+url.QueryEscape(file.FileName))
 	c.Status(http.StatusOK)
+
 	if _, err := io.Copy(c.Writer, file.Reader); err != nil {
 		_ = c.Error(err)
 	}
@@ -198,6 +205,7 @@ func bindBanNamespace(c *gin.Context) (string, bool) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return "", false
 	}
 
@@ -239,11 +247,13 @@ func bindBanScreenshots(c *gin.Context) ([]*multipart.FileHeader, error) {
 		}
 		return nil, err
 	}
+
 	if form == nil || form.File == nil {
 		return nil, nil
 	}
 
 	screenshots := append([]*multipart.FileHeader{}, form.File["screenshots"]...)
+
 	screenshots = append(screenshots, form.File["screenshots[]"]...)
 	if len(screenshots) == 0 {
 		return nil, nil
@@ -262,7 +272,7 @@ func parseBanTime(value string) (time.Time, error) {
 		time.RFC3339Nano,
 		time.RFC3339,
 		"2006-01-02T15:04",
-		"2006-01-02 15:04:05",
+		time.DateTime,
 	}
 
 	for _, layout := range layouts {
@@ -270,6 +280,7 @@ func parseBanTime(value string) (time.Time, error) {
 		if err == nil {
 			return parsed, nil
 		}
+
 		parsed, err = time.ParseInLocation(layout, trimmed, time.Local)
 		if err == nil {
 			return parsed, nil

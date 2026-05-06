@@ -3,6 +3,7 @@ package ban
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -24,7 +25,7 @@ func (s StringList) Value() (driver.Value, error) {
 
 func (s *StringList) Scan(value any) error {
 	if s == nil {
-		return fmt.Errorf("scan string list: nil target")
+		return errors.New("scan string list: nil target")
 	}
 
 	switch typed := value.(type) {
@@ -53,5 +54,6 @@ func (s *StringList) unmarshalBytes(value []byte) error {
 	}
 
 	*s = items
+
 	return nil
 }

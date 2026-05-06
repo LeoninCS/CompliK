@@ -1,9 +1,8 @@
 package projectconfig
 
 import (
-	"sealos-complik-admin/internal/infra/database"
-
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/infra/database"
 )
 
 // InitProjectConfigRoutes wires module dependencies and registers project config APIs.

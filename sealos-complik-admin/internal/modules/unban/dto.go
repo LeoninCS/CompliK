@@ -11,7 +11,7 @@ type UnbanIDRequest struct {
 }
 
 type CreateUnbanRequest struct {
-	Namespace    string `json:"namespace" binding:"required,max=255"`
+	Namespace    string `json:"namespace"     binding:"required,max=255"`
 	OperatorName string `json:"operator_name" binding:"required,max=100"`
 }
 

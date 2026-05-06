@@ -1,9 +1,8 @@
 package unban
 
 import (
-	"sealos-complik-admin/internal/infra/database"
-
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/infra/database"
 )
 
 // InitUnbanRoutes wires module dependencies and registers unban APIs.

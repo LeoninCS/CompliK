@@ -11,8 +11,10 @@ import (
 )
 
 var (
-	ErrViolationInvalidInput = errors.New("namespace, detector name, and detected time are required")
-	ErrViolationNotFound     = errors.New("complik violation not found")
+	ErrViolationInvalidInput = errors.New(
+		"namespace, detector name, and detected time are required",
+	)
+	ErrViolationNotFound = errors.New("complik violation not found")
 )
 
 type Service struct {
@@ -33,10 +35,12 @@ func (s *Service) CreateViolation(ctx context.Context, req CreateViolationReques
 	if err != nil {
 		return err
 	}
+
 	keywordsJSON, err := marshalStringSlice(input.Keywords)
 	if err != nil {
 		return err
 	}
+
 	rawPayloadJSON, err := marshalRawPayload(input.RawPayload)
 	if err != nil {
 		return err
@@ -92,7 +96,11 @@ func (s *Service) DeleteViolationByID(ctx context.Context, id uint64) error {
 	return nil
 }
 
-func (s *Service) GetViolations(ctx context.Context, namespace string, includeAll bool) ([]ViolationResponse, error) {
+func (s *Service) GetViolations(
+	ctx context.Context,
+	namespace string,
+	includeAll bool,
+) ([]ViolationResponse, error) {
 	if err := validateNamespace(namespace); err != nil {
 		return nil, err
 	}
@@ -107,13 +115,17 @@ func (s *Service) GetViolations(ctx context.Context, namespace string, includeAl
 		if !includeAll && !isEffectiveViolation(&violations[i]) {
 			continue
 		}
+
 		responses = append(responses, *toViolationResponse(&violations[i]))
 	}
 
 	return responses, nil
 }
 
-func (s *Service) ListViolations(ctx context.Context, includeAll bool) ([]ViolationResponse, error) {
+func (s *Service) ListViolations(
+	ctx context.Context,
+	includeAll bool,
+) ([]ViolationResponse, error) {
 	violations, err := s.repository.ListViolations(ctx, includeAll)
 	if err != nil {
 		return nil, err
@@ -124,13 +136,17 @@ func (s *Service) ListViolations(ctx context.Context, includeAll bool) ([]Violat
 		if !includeAll && !isEffectiveViolation(&violations[i]) {
 			continue
 		}
+
 		responses = append(responses, *toViolationResponse(&violations[i]))
 	}
 
 	return responses, nil
 }
 
-func (s *Service) GetViolationStatus(ctx context.Context, namespace string) (*ViolationStatusResponse, error) {
+func (s *Service) GetViolationStatus(
+	ctx context.Context,
+	namespace string,
+) (*ViolationStatusResponse, error) {
 	if err := validateNamespace(namespace); err != nil {
 		return nil, err
 	}
@@ -183,6 +199,7 @@ func normalizeViolationInput(req CreateViolationRequest) (*normalizedViolationIn
 	if req.IsIllegal != nil {
 		isIllegal = *req.IsIllegal
 	}
+
 	if rawIsIllegal, ok := readIsIllegalFromRawPayload(req.RawPayload); ok {
 		isIllegal = rawIsIllegal
 	}
@@ -219,6 +236,7 @@ func translateRepositoryError(err error) error {
 	if err == nil {
 		return nil
 	}
+
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrViolationNotFound
 	}
@@ -237,6 +255,7 @@ func marshalStringSlice(values []string) (*string, error) {
 	}
 
 	result := string(data)
+
 	return &result, nil
 }
 
@@ -244,11 +263,13 @@ func marshalRawPayload(payload json.RawMessage) (*string, error) {
 	if len(payload) == 0 {
 		return nil, nil
 	}
+
 	if !json.Valid(payload) {
 		return nil, ErrViolationInvalidInput
 	}
 
 	result := string(payload)
+
 	return &result, nil
 }
 
@@ -261,12 +282,15 @@ func readIsIllegalFromRawPayload(payload json.RawMessage) (bool, bool) {
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return false, false
 	}
+
 	if value, ok := readBool(raw["is_illegal"]); ok {
 		return value, true
 	}
+
 	if value, ok := readBool(raw["IsIllegal"]); ok {
 		return value, true
 	}
+
 	if detectorResult, ok := raw["检测结果"].(map[string]any); ok {
 		if value, ok := readBool(detectorResult["是否违规"]); ok {
 			return value, true
@@ -287,9 +311,11 @@ func isEffectiveViolation(violation *ComplikViolationEvent) bool {
 	if violation == nil {
 		return false
 	}
+
 	if rawIsIllegal, ok := readIsIllegalFromRawPayload(parseRawPayload(violation.RawPayload)); ok {
 		return rawIsIllegal
 	}
+
 	return violation.IsIllegal
 }
 

@@ -14,17 +14,17 @@ type ProjectConfigTypeRequest struct {
 }
 
 type CreateProjectConfigRequest struct {
-	ConfigName  string          `json:"config_name" binding:"required,max=255"`
-	ConfigType  string          `json:"config_type" binding:"required,max=50"`
+	ConfigName  string          `json:"config_name"  binding:"required,max=255"`
+	ConfigType  string          `json:"config_type"  binding:"required,max=50"`
 	ConfigValue json.RawMessage `json:"config_value" binding:"required"`
-	Description string          `json:"description" binding:"omitempty,max=500"`
+	Description string          `json:"description"  binding:"omitempty,max=500"`
 }
 
 type UpdateProjectConfigRequest struct {
-	ConfigName  string          `json:"config_name" binding:"required,max=255"`
-	ConfigType  string          `json:"config_type" binding:"required,max=50"`
+	ConfigName  string          `json:"config_name"  binding:"required,max=255"`
+	ConfigType  string          `json:"config_type"  binding:"required,max=50"`
 	ConfigValue json.RawMessage `json:"config_value" binding:"required"`
-	Description string          `json:"description" binding:"omitempty,max=500"`
+	Description string          `json:"description"  binding:"omitempty,max=500"`
 }
 
 type ProjectConfigResponse struct {

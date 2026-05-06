@@ -14,20 +14,20 @@ type ViolationIDRequest struct {
 }
 
 type CreateViolationRequest struct {
-	Namespace         string          `json:"namespace" binding:"required,max=255"`
-	PodName           string          `json:"pod_name" binding:"omitempty,max=255"`
-	ContainerID       string          `json:"container_id" binding:"omitempty,max=128"`
-	NodeName          string          `json:"node_name" binding:"omitempty,max=128"`
-	PID               int             `json:"pid" binding:"required,min=1"`
-	ProcessName       string          `json:"process_name" binding:"required,max=255"`
-	ProcessCommand    string          `json:"process_command" binding:"required"`
-	MatchType         string          `json:"match_type" binding:"omitempty,max=32"`
-	MatchRule         string          `json:"match_rule" binding:"omitempty,max=255"`
-	Message           string          `json:"message" binding:"required"`
+	Namespace         string          `json:"namespace"           binding:"required,max=255"`
+	PodName           string          `json:"pod_name"            binding:"omitempty,max=255"`
+	ContainerID       string          `json:"container_id"        binding:"omitempty,max=128"`
+	NodeName          string          `json:"node_name"           binding:"omitempty,max=128"`
+	PID               int             `json:"pid"                 binding:"required,min=1"`
+	ProcessName       string          `json:"process_name"        binding:"required,max=255"`
+	ProcessCommand    string          `json:"process_command"     binding:"required"`
+	MatchType         string          `json:"match_type"          binding:"omitempty,max=32"`
+	MatchRule         string          `json:"match_rule"          binding:"omitempty,max=255"`
+	Message           string          `json:"message"             binding:"required"`
 	IsIllegal         *bool           `json:"is_illegal"`
 	LabelActionStatus string          `json:"label_action_status" binding:"omitempty,max=32"`
 	LabelActionResult string          `json:"label_action_result" binding:"omitempty"`
-	DetectedAt        time.Time       `json:"detected_at" binding:"required"`
+	DetectedAt        time.Time       `json:"detected_at"         binding:"required"`
 	RawPayload        json.RawMessage `json:"raw_payload"`
 }
 

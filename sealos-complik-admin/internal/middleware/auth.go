@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"strings"
 
-	"sealos-complik-admin/internal/infra/config"
-
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/infra/config"
 )
 
 func BasicAuth(cfg config.AuthConfig) gin.HandlerFunc {
 	username := strings.TrimSpace(cfg.Username)
 	password := strings.TrimSpace(cfg.Password)
+
 	realm := strings.TrimSpace(cfg.Realm)
 	if realm == "" {
 		realm = "CompliK Admin"
@@ -27,6 +27,7 @@ func BasicAuth(cfg config.AuthConfig) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"message": "unauthorized",
 			})
+
 			return
 		}
 

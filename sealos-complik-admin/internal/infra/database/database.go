@@ -2,13 +2,13 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-
 	"sealos-complik-admin/internal/infra/config"
 )
 
@@ -39,6 +39,7 @@ func Init(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	client = db
+
 	return client, nil
 }
 
@@ -48,6 +49,7 @@ func createDatabase(cfg config.DatabaseConfig) error {
 	if err != nil {
 		return fmt.Errorf("connect mysql server: %w", err)
 	}
+
 	defer func() {
 		_ = closeDB(db)
 	}()
@@ -120,16 +122,19 @@ func serverDSN(cfg config.DatabaseConfig) string {
 // validateConfig checks the minimum fields required to build a valid MySQL DSN.
 func validateConfig(cfg config.DatabaseConfig) error {
 	if cfg.Host == "" {
-		return fmt.Errorf("database host is required")
+		return errors.New("database host is required")
 	}
+
 	if cfg.Port <= 0 || cfg.Port > 65535 {
 		return fmt.Errorf("database port %d is invalid", cfg.Port)
 	}
+
 	if cfg.Username == "" {
-		return fmt.Errorf("database username is required")
+		return errors.New("database username is required")
 	}
+
 	if cfg.Name == "" {
-		return fmt.Errorf("database name is required")
+		return errors.New("database name is required")
 	}
 
 	return nil

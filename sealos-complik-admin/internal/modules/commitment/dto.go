@@ -9,7 +9,7 @@ type CommitmentNamespaceRequest struct {
 type CreateCommitmentRequest struct {
 	Namespace string `json:"namespace" binding:"required,max=255"`
 	FileName  string `json:"file_name" binding:"required,max=255"`
-	FileURL   string `json:"file_url" binding:"required,max=512"`
+	FileURL   string `json:"file_url"  binding:"required,max=512"`
 }
 
 type UploadCommitmentRequest struct {
@@ -18,7 +18,7 @@ type UploadCommitmentRequest struct {
 
 type UpdateCommitmentRequest struct {
 	FileName string `json:"file_name" binding:"required,max=255"`
-	FileURL  string `json:"file_url" binding:"required,max=512"`
+	FileURL  string `json:"file_url"  binding:"required,max=512"`
 }
 
 type CommitmentResponse struct {

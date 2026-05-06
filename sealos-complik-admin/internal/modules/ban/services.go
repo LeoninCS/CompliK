@@ -14,9 +14,11 @@ import (
 )
 
 var (
-	ErrBanInvalidInput   = errors.New("namespace, ban start time, and operator name are required")
-	ErrBanNotFound       = errors.New("ban not found")
-	ErrBanInvalidFile    = errors.New("only png, jpg, jpeg, webp, and gif screenshots are supported")
+	ErrBanInvalidInput = errors.New("namespace, ban start time, and operator name are required")
+	ErrBanNotFound     = errors.New("ban not found")
+	ErrBanInvalidFile  = errors.New(
+		"only png, jpg, jpeg, webp, and gif screenshots are supported",
+	)
 	ErrBanUploadDisabled = errors.New("ban screenshot upload is disabled: oss is not configured")
 )
 
@@ -53,11 +55,19 @@ func (s *Service) CreateBan(ctx context.Context, req CreateBanRequest) error {
 }
 
 // UploadBan creates a new ban record and uploads screenshots to OSS.
-func (s *Service) UploadBan(ctx context.Context, req CreateBanRequest, screenshots []*multipart.FileHeader) error {
+func (s *Service) UploadBan(
+	ctx context.Context,
+	req CreateBanRequest,
+	screenshots []*multipart.FileHeader,
+) error {
 	return s.createBan(ctx, req, screenshots)
 }
 
-func (s *Service) createBan(ctx context.Context, req CreateBanRequest, screenshots []*multipart.FileHeader) error {
+func (s *Service) createBan(
+	ctx context.Context,
+	req CreateBanRequest,
+	screenshots []*multipart.FileHeader,
+) error {
 	input, err := normalizeBanInput(
 		req.Namespace,
 		req.Reason,
@@ -76,6 +86,7 @@ func (s *Service) createBan(ctx context.Context, req CreateBanRequest, screensho
 		if err != nil {
 			return err
 		}
+
 		screenshotURLs = append(screenshotURLs, uploadedURLs...)
 	}
 
@@ -163,11 +174,15 @@ type DownloadedBanScreenshot struct {
 }
 
 // DownloadScreenshotByURL streams a ban screenshot through admin.
-func (s *Service) DownloadScreenshotByURL(ctx context.Context, fileURL string) (*DownloadedBanScreenshot, error) {
+func (s *Service) DownloadScreenshotByURL(
+	ctx context.Context,
+	fileURL string,
+) (*DownloadedBanScreenshot, error) {
 	trimmedURL := strings.TrimSpace(fileURL)
 	if trimmedURL == "" {
 		return nil, ErrBanInvalidInput
 	}
+
 	if s.uploader == nil {
 		return nil, ErrBanUploadDisabled
 	}
@@ -181,6 +196,7 @@ func (s *Service) DownloadScreenshotByURL(ctx context.Context, fileURL string) (
 	if strings.TrimSpace(fileName) == "" || fileName == "." || fileName == "/" {
 		fileName = "screenshot"
 	}
+
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
 	}
@@ -202,7 +218,13 @@ type normalizedBanInput struct {
 }
 
 // normalizeBanInput keeps create validation consistent.
-func normalizeBanInput(namespace, reason string, banStartTime time.Time, banEndTime *time.Time, operatorName string, screenshotURLs []string) (*normalizedBanInput, error) {
+func normalizeBanInput(
+	namespace, reason string,
+	banStartTime time.Time,
+	banEndTime *time.Time,
+	operatorName string,
+	screenshotURLs []string,
+) (*normalizedBanInput, error) {
 	trimmedNamespace := strings.TrimSpace(namespace)
 	trimmedReason := strings.TrimSpace(reason)
 	trimmedOperatorName := strings.TrimSpace(operatorName)
@@ -215,8 +237,13 @@ func normalizeBanInput(namespace, reason string, banStartTime time.Time, banEndT
 	if banEndTime != nil {
 		return nil, ErrBanInvalidInput
 	}
+
 	if len(normalizedScreenshotURLs) > maxBanScreenshotCount {
-		return nil, fmt.Errorf("%w: screenshot count must be at most %d", ErrBanInvalidInput, maxBanScreenshotCount)
+		return nil, fmt.Errorf(
+			"%w: screenshot count must be at most %d",
+			ErrBanInvalidInput,
+			maxBanScreenshotCount,
+		)
 	}
 
 	return &normalizedBanInput{
@@ -229,13 +256,23 @@ func normalizeBanInput(namespace, reason string, banStartTime time.Time, banEndT
 	}, nil
 }
 
-func (s *Service) uploadScreenshots(ctx context.Context, namespace string, screenshots []*multipart.FileHeader) ([]string, error) {
+func (s *Service) uploadScreenshots(
+	ctx context.Context,
+	namespace string,
+	screenshots []*multipart.FileHeader,
+) ([]string, error) {
 	if len(screenshots) == 0 {
 		return nil, nil
 	}
+
 	if len(screenshots) > maxBanScreenshotCount {
-		return nil, fmt.Errorf("%w: screenshot count must be at most %d", ErrBanInvalidInput, maxBanScreenshotCount)
+		return nil, fmt.Errorf(
+			"%w: screenshot count must be at most %d",
+			ErrBanInvalidInput,
+			maxBanScreenshotCount,
+		)
 	}
+
 	if s.uploader == nil {
 		return nil, ErrBanUploadDisabled
 	}
@@ -246,8 +283,13 @@ func (s *Service) uploadScreenshots(ctx context.Context, namespace string, scree
 		if !ok {
 			return nil, ErrBanInvalidFile
 		}
+
 		if screenshot.Size <= 0 || screenshot.Size > maxBanScreenshotFileSizeBytes {
-			return nil, fmt.Errorf("%w: screenshot size must be between 1 byte and %d bytes", ErrBanInvalidFile, maxBanScreenshotFileSizeBytes)
+			return nil, fmt.Errorf(
+				"%w: screenshot size must be between 1 byte and %d bytes",
+				ErrBanInvalidFile,
+				maxBanScreenshotFileSizeBytes,
+			)
 		}
 
 		file, err := screenshot.Open()
@@ -258,9 +300,11 @@ func (s *Service) uploadScreenshots(ctx context.Context, namespace string, scree
 		objectKey := s.buildScreenshotObjectKey(namespace, index, screenshot.Filename)
 		fileURL, uploadErr := s.uploader.Upload(ctx, objectKey, file, contentType)
 		closeErr := file.Close()
+
 		if uploadErr != nil {
 			return nil, uploadErr
 		}
+
 		if closeErr != nil {
 			return nil, fmt.Errorf("close uploaded screenshot: %w", closeErr)
 		}
@@ -282,6 +326,7 @@ func normalizeScreenshotURLs(urls []string) []string {
 		if trimmed == "" {
 			continue
 		}
+
 		normalized = append(normalized, trimmed)
 	}
 
@@ -307,19 +352,23 @@ func screenshotContentType(fileHeader *multipart.FileHeader) (string, bool) {
 
 	switch filepath.Ext(filename) {
 	case ".png":
-		if contentType == "" || contentType == "image/png" || contentType == "application/octet-stream" {
+		if contentType == "" || contentType == "image/png" ||
+			contentType == "application/octet-stream" {
 			return "image/png", true
 		}
 	case ".jpg", ".jpeg":
-		if contentType == "" || contentType == "image/jpeg" || contentType == "application/octet-stream" {
+		if contentType == "" || contentType == "image/jpeg" ||
+			contentType == "application/octet-stream" {
 			return "image/jpeg", true
 		}
 	case ".webp":
-		if contentType == "" || contentType == "image/webp" || contentType == "application/octet-stream" {
+		if contentType == "" || contentType == "image/webp" ||
+			contentType == "application/octet-stream" {
 			return "image/webp", true
 		}
 	case ".gif":
-		if contentType == "" || contentType == "image/gif" || contentType == "application/octet-stream" {
+		if contentType == "" || contentType == "image/gif" ||
+			contentType == "application/octet-stream" {
 			return "image/gif", true
 		}
 	}
@@ -347,11 +396,14 @@ func sanitizePathSegment(value string) string {
 
 	var builder strings.Builder
 	builder.Grow(len(trimmed))
+
 	for _, r := range trimmed {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' ||
+			r == '_' {
 			builder.WriteRune(r)
 			continue
 		}
+
 		builder.WriteByte('_')
 	}
 

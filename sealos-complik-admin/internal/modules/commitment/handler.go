@@ -2,7 +2,6 @@ package commitment
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -38,6 +37,7 @@ func (h *Handler) UploadCommitment(c *gin.Context) {
 			"message": "invalid form data",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -47,6 +47,7 @@ func (h *Handler) UploadCommitment(c *gin.Context) {
 			"message": "missing pdf file",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -70,6 +71,7 @@ func (h *Handler) CreateCommitment(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -96,6 +98,7 @@ func (h *Handler) UpdateCommitment(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -165,13 +168,15 @@ func (h *Handler) DownloadCommitment(c *gin.Context) {
 		h.respondWithServiceError(c, err, "failed to download commitment")
 		return
 	}
+
 	defer func() {
 		_ = file.Reader.Close()
 	}()
 
 	c.Header("Content-Type", file.ContentType)
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", url.QueryEscape(file.FileName)))
+	c.Header("Content-Disposition", "attachment; filename*=UTF-8''"+url.QueryEscape(file.FileName))
 	c.Status(http.StatusOK)
+
 	if _, err := io.Copy(c.Writer, file.Reader); err != nil {
 		_ = c.Error(err)
 	}
@@ -185,6 +190,7 @@ func bindCommitmentNamespace(c *gin.Context) (string, bool) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return "", false
 	}
 

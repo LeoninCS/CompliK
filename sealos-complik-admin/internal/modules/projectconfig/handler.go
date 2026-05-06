@@ -24,6 +24,7 @@ func (h *Handler) CreateProjectConfig(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -49,6 +50,7 @@ func (h *Handler) CreateProjectConfig(c *gin.Context) {
 				"error":   err.Error(),
 			})
 		}
+
 		return
 	}
 
@@ -70,6 +72,7 @@ func (h *Handler) UpdateProjectConfig(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -151,6 +154,7 @@ func bindProjectConfigName(c *gin.Context) (string, bool) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return "", false
 	}
 
@@ -165,6 +169,7 @@ func bindProjectConfigType(c *gin.Context) (string, bool) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return "", false
 	}
 

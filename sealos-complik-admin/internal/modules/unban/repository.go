@@ -22,9 +22,14 @@ func (r *Repository) CreateUnban(ctx context.Context, unban *Unban) error {
 // GetUnbansByNamespace returns all unban records for the given namespace.
 func (r *Repository) GetUnbansByNamespace(ctx context.Context, namespace string) ([]Unban, error) {
 	var unbans []Unban
-	if err := r.db.WithContext(ctx).Where("namespace = ?", namespace).Order("created_at DESC, id DESC").Find(&unbans).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("namespace = ?", namespace).
+		Order("created_at DESC, id DESC").
+		Find(&unbans).
+		Error; err != nil {
 		return nil, err
 	}
+
 	if len(unbans) == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
@@ -35,7 +40,10 @@ func (r *Repository) GetUnbansByNamespace(ctx context.Context, namespace string)
 // ListUnbans returns all unban records.
 func (r *Repository) ListUnbans(ctx context.Context) ([]Unban, error) {
 	var unbans []Unban
-	if err := r.db.WithContext(ctx).Order("created_at DESC, id DESC").Find(&unbans).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Order("created_at DESC, id DESC").
+		Find(&unbans).
+		Error; err != nil {
 		return nil, err
 	}
 
@@ -48,6 +56,7 @@ func (r *Repository) DeleteUnbanByID(ctx context.Context, id uint64) error {
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}

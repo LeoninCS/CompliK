@@ -37,6 +37,7 @@ func (r *Repository) CreateViolation(ctx context.Context, violation *ProcscanVio
 		if err := tx.Create(violation).Error; err != nil {
 			return err
 		}
+
 		if !violation.IsIllegal {
 			return tx.Model(&ProcscanViolationEvent{}).
 				Where("id = ?", violation.ID).
@@ -47,8 +48,13 @@ func (r *Repository) CreateViolation(ctx context.Context, violation *ProcscanVio
 	})
 }
 
-func (r *Repository) GetViolationsByNamespace(ctx context.Context, namespace string, includeAll bool) ([]ProcscanViolationEvent, error) {
+func (r *Repository) GetViolationsByNamespace(
+	ctx context.Context,
+	namespace string,
+	includeAll bool,
+) ([]ProcscanViolationEvent, error) {
 	var violations []ProcscanViolationEvent
+
 	query := r.db.WithContext(ctx).Where("namespace = ?", namespace)
 	if !includeAll {
 		query = query.Where(procscanEffectiveViolationCondition)
@@ -59,6 +65,7 @@ func (r *Repository) GetViolationsByNamespace(ctx context.Context, namespace str
 		Find(&violations).Error; err != nil {
 		return nil, err
 	}
+
 	if len(violations) == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
@@ -66,8 +73,12 @@ func (r *Repository) GetViolationsByNamespace(ctx context.Context, namespace str
 	return violations, nil
 }
 
-func (r *Repository) ListViolations(ctx context.Context, includeAll bool) ([]ProcscanViolationEvent, error) {
+func (r *Repository) ListViolations(
+	ctx context.Context,
+	includeAll bool,
+) ([]ProcscanViolationEvent, error) {
 	var violations []ProcscanViolationEvent
+
 	query := r.db.WithContext(ctx)
 	if !includeAll {
 		query = query.Where(procscanEffectiveViolationCondition)
@@ -85,6 +96,7 @@ func (r *Repository) DeleteViolationByID(ctx context.Context, id uint64) error {
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
@@ -93,10 +105,13 @@ func (r *Repository) DeleteViolationByID(ctx context.Context, id uint64) error {
 }
 
 func (r *Repository) DeleteViolationsByNamespace(ctx context.Context, namespace string) error {
-	result := r.db.WithContext(ctx).Where("namespace = ?", namespace).Delete(&ProcscanViolationEvent{})
+	result := r.db.WithContext(ctx).
+		Where("namespace = ?", namespace).
+		Delete(&ProcscanViolationEvent{})
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}

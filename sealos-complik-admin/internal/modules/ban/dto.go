@@ -15,19 +15,19 @@ type BanScreenshotQueryRequest struct {
 }
 
 type CreateBanRequest struct {
-	Namespace      string     `json:"namespace" binding:"required,max=255"`
-	Reason         string     `json:"reason" binding:"omitempty,max=10000"`
+	Namespace      string     `json:"namespace"       binding:"required,max=255"`
+	Reason         string     `json:"reason"          binding:"omitempty,max=10000"`
 	ScreenshotURLs []string   `json:"screenshot_urls"`
-	BanStartTime   time.Time  `json:"ban_start_time" binding:"required"`
+	BanStartTime   time.Time  `json:"ban_start_time"  binding:"required"`
 	BanEndTime     *time.Time `json:"ban_end_time"`
-	OperatorName   string     `json:"operator_name" binding:"required,max=100"`
+	OperatorName   string     `json:"operator_name"   binding:"required,max=100"`
 }
 
 type UploadBanRequest struct {
-	Namespace    string `form:"namespace" binding:"required,max=255"`
-	Reason       string `form:"reason" binding:"omitempty,max=10000"`
+	Namespace    string `form:"namespace"      binding:"required,max=255"`
+	Reason       string `form:"reason"         binding:"omitempty,max=10000"`
 	BanStartTime string `form:"ban_start_time" binding:"required"`
-	OperatorName string `form:"operator_name" binding:"required,max=100"`
+	OperatorName string `form:"operator_name"  binding:"required,max=100"`
 }
 
 type BanResponse struct {

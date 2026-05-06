@@ -3,6 +3,7 @@ package oss
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -10,12 +11,16 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-
 	"sealos-complik-admin/internal/infra/config"
 )
 
 type Uploader interface {
-	Upload(ctx context.Context, objectKey string, reader io.Reader, contentType string) (string, error)
+	Upload(
+		ctx context.Context,
+		objectKey string,
+		reader io.Reader,
+		contentType string,
+	) (string, error)
 	DownloadByURL(ctx context.Context, fileURL string) (io.ReadCloser, string, error)
 }
 
@@ -32,11 +37,13 @@ func NewClient(cfg config.OSSConfig) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("oss endpoint is invalid: %w", err)
 	}
+
 	if strings.TrimSpace(cfg.Bucket) == "" {
-		return nil, fmt.Errorf("oss bucket is required")
+		return nil, errors.New("oss bucket is required")
 	}
+
 	if strings.TrimSpace(cfg.AccessKeyID) == "" || strings.TrimSpace(cfg.AccessKeySecret) == "" {
-		return nil, fmt.Errorf("oss access key is required")
+		return nil, errors.New("oss access key is required")
 	}
 
 	client, err := minio.New(endpoint, &minio.Options{
@@ -56,10 +63,15 @@ func NewClient(cfg config.OSSConfig) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Upload(ctx context.Context, objectKey string, reader io.Reader, contentType string) (string, error) {
+func (c *Client) Upload(
+	ctx context.Context,
+	objectKey string,
+	reader io.Reader,
+	contentType string,
+) (string, error) {
 	normalizedKey := strings.TrimLeft(strings.TrimSpace(objectKey), "/")
 	if normalizedKey == "" {
-		return "", fmt.Errorf("oss object key is required")
+		return "", errors.New("oss object key is required")
 	}
 
 	body, err := io.ReadAll(reader)
@@ -72,7 +84,14 @@ func (c *Client) Upload(ctx context.Context, objectKey string, reader io.Reader,
 		options.ContentType = contentType
 	}
 
-	if _, err := c.client.PutObject(ctx, c.bucketName, normalizedKey, bytes.NewReader(body), int64(len(body)), options); err != nil {
+	if _, err := c.client.PutObject(
+		ctx,
+		c.bucketName,
+		normalizedKey,
+		bytes.NewReader(body),
+		int64(len(body)),
+		options,
+	); err != nil {
 		return "", fmt.Errorf("upload object to oss: %w", err)
 	}
 
@@ -82,7 +101,7 @@ func (c *Client) Upload(ctx context.Context, objectKey string, reader io.Reader,
 func (c *Client) Download(ctx context.Context, objectKey string) (io.ReadCloser, string, error) {
 	normalizedKey := strings.TrimLeft(strings.TrimSpace(objectKey), "/")
 	if normalizedKey == "" {
-		return nil, "", fmt.Errorf("oss object key is required")
+		return nil, "", errors.New("oss object key is required")
 	}
 
 	object, err := c.client.GetObject(ctx, c.bucketName, normalizedKey, minio.GetObjectOptions{})
@@ -129,31 +148,33 @@ func (c *Client) objectURL(objectKey string) string {
 func (c *Client) objectKeyFromURL(fileURL string) (string, error) {
 	trimmedURL := strings.TrimSpace(fileURL)
 	if trimmedURL == "" {
-		return "", fmt.Errorf("file url is required")
+		return "", errors.New("file url is required")
 	}
 
 	base := strings.TrimRight(c.objectURL(""), "/")
-	if strings.HasPrefix(trimmedURL, base+"/") {
-		return strings.TrimPrefix(trimmedURL, base+"/"), nil
+	if after, ok := strings.CutPrefix(trimmedURL, base+"/"); ok {
+		return after, nil
 	}
 
 	parsed, err := url.Parse(trimmedURL)
 	if err != nil {
 		return "", fmt.Errorf("parse file url: %w", err)
 	}
+
 	normalizedPath := strings.Trim(parsed.Path, "/")
+
 	bucketPrefix := strings.Trim(c.bucketName, "/") + "/"
-	if strings.HasPrefix(normalizedPath, bucketPrefix) {
-		return strings.TrimPrefix(normalizedPath, bucketPrefix), nil
+	if after, ok := strings.CutPrefix(normalizedPath, bucketPrefix); ok {
+		return after, nil
 	}
 
-	return "", fmt.Errorf("invalid file url")
+	return "", errors.New("invalid file url")
 }
 
 func normalizeEndpoint(raw string) (string, bool, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return "", false, fmt.Errorf("empty endpoint")
+		return "", false, errors.New("empty endpoint")
 	}
 
 	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
@@ -161,17 +182,20 @@ func normalizeEndpoint(raw string) (string, bool, error) {
 		if err != nil {
 			return "", false, err
 		}
+
 		if parsed.Host == "" {
-			return "", false, fmt.Errorf("invalid endpoint host")
+			return "", false, errors.New("invalid endpoint host")
 		}
+
 		if parsed.Path != "" && parsed.Path != "/" {
-			return "", false, fmt.Errorf("endpoint must not contain path")
+			return "", false, errors.New("endpoint must not contain path")
 		}
+
 		return parsed.Host, parsed.Scheme == "https", nil
 	}
 
 	if strings.Contains(trimmed, "/") {
-		return "", false, fmt.Errorf("endpoint must be host[:port] or URL without path")
+		return "", false, errors.New("endpoint must be host[:port] or URL without path")
 	}
 
 	return trimmed, true, nil

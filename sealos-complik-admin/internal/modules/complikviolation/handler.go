@@ -24,6 +24,7 @@ func (h *Handler) CreateViolation(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -60,6 +61,7 @@ func (h *Handler) DeleteViolationByID(c *gin.Context) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -130,6 +132,7 @@ func bindNamespace(c *gin.Context) (string, bool) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return "", false
 	}
 
@@ -148,6 +151,7 @@ func bindIncludeAllQuery(c *gin.Context) (bool, bool) {
 			"message": "invalid include_all query",
 			"error":   err.Error(),
 		})
+
 		return false, false
 	}
 

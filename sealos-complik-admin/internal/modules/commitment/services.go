@@ -29,7 +29,12 @@ const (
 )
 
 type fileUploader interface {
-	Upload(ctx context.Context, objectKey string, reader io.Reader, contentType string) (string, error)
+	Upload(
+		ctx context.Context,
+		objectKey string,
+		reader io.Reader,
+		contentType string,
+	) (string, error)
 	DownloadByURL(ctx context.Context, fileURL string) (io.ReadCloser, string, error)
 }
 
@@ -85,7 +90,11 @@ func (s *Service) CreateCommitment(ctx context.Context, req CreateCommitmentRequ
 }
 
 // UpdateCommitment updates the commitment record for the given namespace.
-func (s *Service) UpdateCommitment(ctx context.Context, namespace string, req UpdateCommitmentRequest) error {
+func (s *Service) UpdateCommitment(
+	ctx context.Context,
+	namespace string,
+	req UpdateCommitmentRequest,
+) error {
 	commitment, err := s.repository.GetCommitmentByNamespace(ctx, namespace)
 	if err != nil {
 		return translateRepositoryError(err)
@@ -116,7 +125,10 @@ func (s *Service) DeleteCommitment(ctx context.Context, namespace string) error 
 }
 
 // GetCommitment returns the commitment record for the given namespace.
-func (s *Service) GetCommitment(ctx context.Context, namespace string) (*CommitmentResponse, error) {
+func (s *Service) GetCommitment(
+	ctx context.Context,
+	namespace string,
+) (*CommitmentResponse, error) {
 	commitment, err := s.repository.GetCommitmentByNamespace(ctx, namespace)
 	if err != nil {
 		return nil, translateRepositoryError(err)
@@ -141,39 +153,53 @@ func (s *Service) ListCommitments(ctx context.Context) ([]CommitmentResponse, er
 }
 
 // UploadCommitment uploads commitment PDF and upserts commitment metadata by namespace.
-func (s *Service) UploadCommitment(ctx context.Context, namespace string, fileHeader *multipart.FileHeader) (*CommitmentResponse, error) {
+func (s *Service) UploadCommitment(
+	ctx context.Context,
+	namespace string,
+	fileHeader *multipart.FileHeader,
+) (*CommitmentResponse, error) {
 	trimmedNamespace := strings.TrimSpace(namespace)
 	if trimmedNamespace == "" || fileHeader == nil {
 		return nil, ErrCommitmentInvalidInput
 	}
+
 	if s.uploader == nil {
 		return nil, ErrCommitmentUploadDisabled
 	}
+
 	if !isPDFFile(fileHeader) {
 		return nil, ErrCommitmentInvalidFile
 	}
+
 	if fileHeader.Size <= 0 || fileHeader.Size > maxCommitmentFileSizeBytes {
-		return nil, fmt.Errorf("pdf size must be between 1 byte and %d bytes", maxCommitmentFileSizeBytes)
+		return nil, fmt.Errorf(
+			"pdf size must be between 1 byte and %d bytes",
+			maxCommitmentFileSizeBytes,
+		)
 	}
 
 	file, err := fileHeader.Open()
 	if err != nil {
 		return nil, fmt.Errorf("open uploaded file: %w", err)
 	}
+
 	defer func() {
 		_ = file.Close()
 	}()
 
 	objectKey := s.buildObjectKey(trimmedNamespace, fileHeader.Filename)
+
 	fileURL, err := s.uploader.Upload(ctx, objectKey, file, pdfContentType)
 	if err != nil {
 		return nil, err
 	}
 
 	fileName := strings.TrimSpace(fileHeader.Filename)
+
 	existing, err := s.repository.GetCommitmentByNamespace(ctx, trimmedNamespace)
 	if err == nil {
 		existing.FileName = fileName
+
 		existing.FileURL = fileURL
 		if saveErr := s.repository.UpdateCommitment(ctx, existing); saveErr != nil {
 			return nil, translateRepositoryError(saveErr)
@@ -181,6 +207,7 @@ func (s *Service) UploadCommitment(ctx context.Context, namespace string, fileHe
 
 		return toCommitmentResponse(existing), nil
 	}
+
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, translateRepositoryError(err)
 	}
@@ -198,11 +225,15 @@ func (s *Service) UploadCommitment(ctx context.Context, namespace string, fileHe
 }
 
 // DownloadCommitment streams the commitment file for browser download.
-func (s *Service) DownloadCommitment(ctx context.Context, namespace string) (*DownloadedCommitmentFile, error) {
+func (s *Service) DownloadCommitment(
+	ctx context.Context,
+	namespace string,
+) (*DownloadedCommitmentFile, error) {
 	trimmedNamespace := strings.TrimSpace(namespace)
 	if trimmedNamespace == "" {
 		return nil, ErrCommitmentInvalidInput
 	}
+
 	if s.uploader == nil {
 		return nil, ErrCommitmentUploadDisabled
 	}
@@ -221,6 +252,7 @@ func (s *Service) DownloadCommitment(ctx context.Context, namespace string) (*Do
 	if fileName == "" {
 		fileName = filepath.Base(strings.TrimSpace(commitment.FileURL))
 	}
+
 	if strings.TrimSpace(contentType) == "" {
 		contentType = pdfContentType
 	}
@@ -239,16 +271,22 @@ type normalizedCommitmentInput struct {
 }
 
 // normalizeCreateCommitmentInput keeps create validation consistent.
-func normalizeCreateCommitmentInput(namespace, fileName, fileURL string) (*normalizedCommitmentInput, error) {
+func normalizeCreateCommitmentInput(
+	namespace, fileName, fileURL string,
+) (*normalizedCommitmentInput, error) {
 	return normalizeCommitmentInput(namespace, fileName, fileURL)
 }
 
 // normalizeUpdateCommitmentInput keeps update validation consistent.
-func normalizeUpdateCommitmentInput(namespace, fileName, fileURL string) (*normalizedCommitmentInput, error) {
+func normalizeUpdateCommitmentInput(
+	namespace, fileName, fileURL string,
+) (*normalizedCommitmentInput, error) {
 	return normalizeCommitmentInput(namespace, fileName, fileURL)
 }
 
-func normalizeCommitmentInput(namespace, fileName, fileURL string) (*normalizedCommitmentInput, error) {
+func normalizeCommitmentInput(
+	namespace, fileName, fileURL string,
+) (*normalizedCommitmentInput, error) {
 	trimmedNamespace := strings.TrimSpace(namespace)
 	trimmedFileName := strings.TrimSpace(fileName)
 	trimmedFileURL := strings.TrimSpace(fileURL)
@@ -281,7 +319,9 @@ func isPDFFile(fileHeader *multipart.FileHeader) bool {
 	}
 
 	contentType := strings.TrimSpace(fileHeader.Header.Get("Content-Type"))
-	return contentType == "" || contentType == pdfContentType || contentType == "application/octet-stream"
+
+	return contentType == "" || contentType == pdfContentType ||
+		contentType == "application/octet-stream"
 }
 
 func (s *Service) buildObjectKey(namespace, filename string) string {
@@ -304,11 +344,14 @@ func sanitizePathSegment(value string) string {
 
 	var b strings.Builder
 	b.Grow(len(trimmed))
+
 	for _, r := range trimmed {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' ||
+			r == '_' {
 			b.WriteRune(r)
 			continue
 		}
+
 		b.WriteByte('_')
 	}
 
@@ -324,6 +367,7 @@ func translateRepositoryError(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrCommitmentNotFound
 	}
+
 	if errors.Is(err, http.ErrMissingFile) {
 		return ErrCommitmentInvalidInput
 	}

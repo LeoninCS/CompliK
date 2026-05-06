@@ -23,6 +23,7 @@ func (h *Handler) CreateUnban(c *gin.Context) {
 			"message": "invalid request body",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -44,6 +45,7 @@ func (h *Handler) DeleteUnbanByID(c *gin.Context) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -92,6 +94,7 @@ func bindUnbanNamespace(c *gin.Context) (string, bool) {
 			"message": "invalid request path",
 			"error":   err.Error(),
 		})
+
 		return "", false
 	}
 

@@ -20,9 +20,15 @@ func (r *Repository) CreateProjectConfig(ctx context.Context, projectConfig *Pro
 }
 
 // GetProjectConfigByName returns a project configuration by its config name.
-func (r *Repository) GetProjectConfigByName(ctx context.Context, configName string) (*ProjectConfig, error) {
+func (r *Repository) GetProjectConfigByName(
+	ctx context.Context,
+	configName string,
+) (*ProjectConfig, error) {
 	var projectConfig ProjectConfig
-	if err := r.db.WithContext(ctx).Where("config_name = ?", configName).First(&projectConfig).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("config_name = ?", configName).
+		First(&projectConfig).
+		Error; err != nil {
 		return nil, err
 	}
 
@@ -40,7 +46,10 @@ func (r *Repository) ListProjectConfigs(ctx context.Context) ([]ProjectConfig, e
 }
 
 // ListProjectConfigsByType returns project configurations filtered by config type.
-func (r *Repository) ListProjectConfigsByType(ctx context.Context, configType string) ([]ProjectConfig, error) {
+func (r *Repository) ListProjectConfigsByType(
+	ctx context.Context,
+	configType string,
+) ([]ProjectConfig, error) {
 	var projectConfigs []ProjectConfig
 	if err := r.db.WithContext(ctx).
 		Where("config_type = ?", configType).
@@ -63,6 +72,7 @@ func (r *Repository) DeleteProjectConfigByName(ctx context.Context, configName s
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}

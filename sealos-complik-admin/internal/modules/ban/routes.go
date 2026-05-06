@@ -4,16 +4,16 @@ import (
 	"log"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"sealos-complik-admin/internal/infra/config"
 	"sealos-complik-admin/internal/infra/database"
 	"sealos-complik-admin/internal/infra/oss"
-
-	"github.com/gin-gonic/gin"
 )
 
 // InitBanRoutes wires module dependencies and registers ban APIs.
 func InitBanRoutes(g *gin.Engine, cfg *config.Config) {
 	repository := NewRepository(database.Get())
+
 	var uploader *oss.Client
 	if cfg != nil {
 		client, err := oss.NewClient(cfg.OSS)
@@ -23,6 +23,7 @@ func InitBanRoutes(g *gin.Engine, cfg *config.Config) {
 			uploader = client
 		}
 	}
+
 	service := NewService(repository, uploader, buildBanObjectPrefix(cfg))
 	handler := NewHandler(service)
 

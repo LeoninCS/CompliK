@@ -27,10 +27,16 @@ func NewService(repository *Repository) *Service {
 
 // CreateProjectConfig creates a new project configuration based on the provided request data.
 func (s *Service) CreateProjectConfig(ctx context.Context, req CreateProjectConfigRequest) error {
-	input, err := normalizeProjectConfigInput(req.ConfigName, req.ConfigType, req.ConfigValue, req.Description)
+	input, err := normalizeProjectConfigInput(
+		req.ConfigName,
+		req.ConfigType,
+		req.ConfigValue,
+		req.Description,
+	)
 	if err != nil {
 		return err
 	}
+
 	projectConfig := &ProjectConfig{
 		ConfigName:  input.ConfigName,
 		ConfigType:  input.ConfigType,
@@ -47,13 +53,22 @@ func (s *Service) CreateProjectConfig(ctx context.Context, req CreateProjectConf
 }
 
 // UpdateProjectConfig updates an existing project configuration.
-func (s *Service) UpdateProjectConfig(ctx context.Context, configName string, req UpdateProjectConfigRequest) error {
+func (s *Service) UpdateProjectConfig(
+	ctx context.Context,
+	configName string,
+	req UpdateProjectConfigRequest,
+) error {
 	projectConfig, err := s.repository.GetProjectConfigByName(ctx, strings.TrimSpace(configName))
 	if err != nil {
 		return translateRepositoryError(err)
 	}
 
-	input, err := normalizeProjectConfigInput(req.ConfigName, req.ConfigType, req.ConfigValue, req.Description)
+	input, err := normalizeProjectConfigInput(
+		req.ConfigName,
+		req.ConfigType,
+		req.ConfigValue,
+		req.Description,
+	)
 	if err != nil {
 		return err
 	}
@@ -72,7 +87,10 @@ func (s *Service) UpdateProjectConfig(ctx context.Context, configName string, re
 
 // DeleteProjectConfig deletes a project configuration by config name.
 func (s *Service) DeleteProjectConfig(ctx context.Context, configName string) error {
-	if err := s.repository.DeleteProjectConfigByName(ctx, strings.TrimSpace(configName)); err != nil {
+	if err := s.repository.DeleteProjectConfigByName(
+		ctx,
+		strings.TrimSpace(configName),
+	); err != nil {
 		return translateRepositoryError(err)
 	}
 
@@ -80,7 +98,10 @@ func (s *Service) DeleteProjectConfig(ctx context.Context, configName string) er
 }
 
 // GetProjectConfig returns a project configuration by config name.
-func (s *Service) GetProjectConfig(ctx context.Context, configName string) (*ProjectConfigResponse, error) {
+func (s *Service) GetProjectConfig(
+	ctx context.Context,
+	configName string,
+) (*ProjectConfigResponse, error) {
 	projectConfig, err := s.repository.GetProjectConfigByName(ctx, strings.TrimSpace(configName))
 	if err != nil {
 		return nil, translateRepositoryError(err)
@@ -105,7 +126,10 @@ func (s *Service) ListProjectConfigs(ctx context.Context) ([]ProjectConfigRespon
 }
 
 // ListProjectConfigsByType returns project configurations filtered by config type.
-func (s *Service) ListProjectConfigsByType(ctx context.Context, configType string) ([]ProjectConfigResponse, error) {
+func (s *Service) ListProjectConfigsByType(
+	ctx context.Context,
+	configType string,
+) ([]ProjectConfigResponse, error) {
 	trimmedConfigType := strings.TrimSpace(configType)
 	if trimmedConfigType == "" {
 		return nil, ErrProjectConfigInvalidInput
@@ -132,7 +156,11 @@ type normalizedProjectConfigInput struct {
 }
 
 // normalizeProjectConfigInput keeps create/update validation consistent.
-func normalizeProjectConfigInput(configName, configType string, configValue json.RawMessage, description string) (*normalizedProjectConfigInput, error) {
+func normalizeProjectConfigInput(
+	configName, configType string,
+	configValue json.RawMessage,
+	description string,
+) (*normalizedProjectConfigInput, error) {
 	trimmedConfigName := strings.TrimSpace(configName)
 	trimmedConfigType := strings.TrimSpace(configType)
 	trimmedDescription := strings.TrimSpace(description)

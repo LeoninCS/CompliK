@@ -1,13 +1,16 @@
-package config
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"sealos-complik-admin/internal/infra/config"
 )
 
 func TestLoadConfigAppliesDatabaseEnvOverrides(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
+
 	content := []byte(`port: 8081
 database:
   host: file-host
@@ -18,7 +21,7 @@ database:
 auth:
   realm: File Realm
 `)
-	if err := os.WriteFile(configPath, content, 0600); err != nil {
+	if err := os.WriteFile(configPath, content, 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
@@ -28,20 +31,24 @@ auth:
 	t.Setenv("DB_PASSWORD", "env-password")
 	t.Setenv("DB_NAME", "env-db")
 
-	cfg := LoadConfig(configPath)
+	cfg := config.LoadConfig(configPath)
 
 	if cfg.Database.Host != "env-host" {
 		t.Fatalf("host = %q, want env-host", cfg.Database.Host)
 	}
+
 	if cfg.Database.Port != 3308 {
 		t.Fatalf("port = %d, want 3308", cfg.Database.Port)
 	}
+
 	if cfg.Database.Username != "root" {
 		t.Fatalf("username = %q, want root", cfg.Database.Username)
 	}
+
 	if cfg.Database.Password != "env-password" {
 		t.Fatalf("password = %q, want env-password", cfg.Database.Password)
 	}
+
 	if cfg.Database.Name != "env-db" {
 		t.Fatalf("name = %q, want env-db", cfg.Database.Name)
 	}

@@ -74,6 +74,7 @@ func LoadConfig(configFile string) *Config {
 	if err := loadConfigInto(configFile, cfg, false); err != nil {
 		log.Printf("read config file %q failed: %v, using default config", configFile, err)
 	}
+
 	applyEnvOverrides(cfg)
 
 	return cfg
@@ -109,6 +110,7 @@ func applyDatabaseEnvOverrides(cfg *Config) {
 	if value := strings.TrimSpace(os.Getenv("DB_HOST")); value != "" {
 		cfg.Database.Host = value
 	}
+
 	if value := strings.TrimSpace(os.Getenv("DB_PORT")); value != "" {
 		port, err := strconv.Atoi(value)
 		if err != nil {
@@ -117,12 +119,15 @@ func applyDatabaseEnvOverrides(cfg *Config) {
 			cfg.Database.Port = port
 		}
 	}
+
 	if value := strings.TrimSpace(os.Getenv("DB_USERNAME")); value != "" {
 		cfg.Database.Username = value
 	}
+
 	if value, ok := os.LookupEnv("DB_PASSWORD"); ok {
 		cfg.Database.Password = value
 	}
+
 	if value := strings.TrimSpace(os.Getenv("DB_NAME")); value != "" {
 		cfg.Database.Name = value
 	}
@@ -137,15 +142,19 @@ func applyAuthEnvOverrides(cfg *Config) {
 			cfg.Auth.Enabled = enabled
 		}
 	}
+
 	if value := strings.TrimSpace(os.Getenv("ADMIN_BASIC_AUTH_USERNAME")); value != "" {
 		cfg.Auth.Username = value
 	}
+
 	if value := strings.TrimSpace(os.Getenv("ADMIN_BASIC_AUTH_PASSWORD")); value != "" {
 		cfg.Auth.Password = value
 	}
+
 	if value := strings.TrimSpace(os.Getenv("ADMIN_BASIC_AUTH_REALM")); value != "" {
 		cfg.Auth.Realm = value
 	}
+
 	if strings.TrimSpace(cfg.Auth.Realm) == "" {
 		cfg.Auth.Realm = defaultAuthRealm
 	}

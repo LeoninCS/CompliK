@@ -33,6 +33,7 @@ func (r *Repository) CreateViolation(ctx context.Context, violation *ComplikViol
 		if err := tx.Create(violation).Error; err != nil {
 			return err
 		}
+
 		if !violation.IsIllegal {
 			return tx.Model(&ComplikViolationEvent{}).
 				Where("id = ?", violation.ID).
@@ -43,8 +44,13 @@ func (r *Repository) CreateViolation(ctx context.Context, violation *ComplikViol
 	})
 }
 
-func (r *Repository) GetViolationsByNamespace(ctx context.Context, namespace string, includeAll bool) ([]ComplikViolationEvent, error) {
+func (r *Repository) GetViolationsByNamespace(
+	ctx context.Context,
+	namespace string,
+	includeAll bool,
+) ([]ComplikViolationEvent, error) {
 	var violations []ComplikViolationEvent
+
 	query := r.db.WithContext(ctx).Where("namespace = ?", namespace)
 	if !includeAll {
 		query = query.Where(complikEffectiveViolationCondition)
@@ -55,6 +61,7 @@ func (r *Repository) GetViolationsByNamespace(ctx context.Context, namespace str
 		Find(&violations).Error; err != nil {
 		return nil, err
 	}
+
 	if len(violations) == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
@@ -62,8 +69,12 @@ func (r *Repository) GetViolationsByNamespace(ctx context.Context, namespace str
 	return violations, nil
 }
 
-func (r *Repository) ListViolations(ctx context.Context, includeAll bool) ([]ComplikViolationEvent, error) {
+func (r *Repository) ListViolations(
+	ctx context.Context,
+	includeAll bool,
+) ([]ComplikViolationEvent, error) {
 	var violations []ComplikViolationEvent
+
 	query := r.db.WithContext(ctx)
 	if !includeAll {
 		query = query.Where(complikEffectiveViolationCondition)
@@ -81,6 +92,7 @@ func (r *Repository) DeleteViolationByID(ctx context.Context, id uint64) error {
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
@@ -89,10 +101,13 @@ func (r *Repository) DeleteViolationByID(ctx context.Context, id uint64) error {
 }
 
 func (r *Repository) DeleteViolationsByNamespace(ctx context.Context, namespace string) error {
-	result := r.db.WithContext(ctx).Where("namespace = ?", namespace).Delete(&ComplikViolationEvent{})
+	result := r.db.WithContext(ctx).
+		Where("namespace = ?", namespace).
+		Delete(&ComplikViolationEvent{})
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}

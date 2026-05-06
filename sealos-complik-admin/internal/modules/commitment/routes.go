@@ -2,20 +2,22 @@ package commitment
 
 import (
 	"log"
+
+	"github.com/gin-gonic/gin"
 	"sealos-complik-admin/internal/infra/config"
 	"sealos-complik-admin/internal/infra/database"
 	"sealos-complik-admin/internal/infra/oss"
-
-	"github.com/gin-gonic/gin"
 )
 
 // InitCommitmentRoutes wires module dependencies and registers commitment APIs.
 func InitCommitmentRoutes(g *gin.Engine, cfg *config.Config) error {
 	repository := NewRepository(database.Get())
+
 	uploader, err := oss.NewClient(cfg.OSS)
 	if err != nil {
 		log.Printf("commitment uploader disabled: %v", err)
 	}
+
 	service := NewService(repository, uploader, cfg.OSS.ObjectPrefix)
 	handler := NewHandler(service)
 

@@ -20,9 +20,15 @@ func (r *Repository) CreateCommitment(ctx context.Context, commitment *Commitmen
 }
 
 // GetCommitmentByNamespace returns a commitment by namespace.
-func (r *Repository) GetCommitmentByNamespace(ctx context.Context, namespace string) (*Commitment, error) {
+func (r *Repository) GetCommitmentByNamespace(
+	ctx context.Context,
+	namespace string,
+) (*Commitment, error) {
 	var commitment Commitment
-	if err := r.db.WithContext(ctx).Where("namespace = ?", namespace).First(&commitment).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("namespace = ?", namespace).
+		First(&commitment).
+		Error; err != nil {
 		return nil, err
 	}
 
@@ -50,6 +56,7 @@ func (r *Repository) DeleteCommitmentByNamespace(ctx context.Context, namespace 
 	if result.Error != nil {
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}

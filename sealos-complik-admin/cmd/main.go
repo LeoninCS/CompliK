@@ -30,25 +30,36 @@ func resolveConfigFile() string {
 }
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	cfg := config.LoadConfig(resolveConfigFile())
 
 	if _, err := database.Init(cfg.Database); err != nil {
-		log.Fatalf("initialize database: %v", err)
+		return fmt.Errorf("initialize database: %w", err)
 	}
+
 	defer database.CloseWithReport(log.Printf)
 
 	if err := migration.AutoMigrate(database.Get()); err != nil {
-		log.Fatalf("auto migrate tables: %v", err)
+		return fmt.Errorf("auto migrate tables: %w", err)
 	}
 
 	srv, err := router.InitRouter(cfg)
 	if err != nil {
-		log.Fatalf("initialize router: %v", err)
+		return fmt.Errorf("initialize router: %w", err)
 	}
+
 	addr := fmt.Sprintf(":%d", cfg.Port)
 
 	log.Printf("server listening on %s", addr)
+
 	if err := srv.Run(addr); err != nil {
-		log.Fatalf("run server: %v", err)
+		return fmt.Errorf("run server: %w", err)
 	}
+
+	return nil
 }
