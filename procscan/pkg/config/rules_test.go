@@ -243,12 +243,13 @@ var _ = Describe("ValidationRules", func() {
 
 		It("should reject file when IsDir is true", func() {
 			file := filepath.Join(tmpDir, "test.txt")
-			os.WriteFile(file, []byte("test"), 0o644)
+			err := os.WriteFile(file, []byte("test"), 0o600)
+			Expect(err).NotTo(HaveOccurred())
 
 			rule := &PathRule{MustExist: true, IsDir: true}
-			err := rule.Validate(file)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Code).To(Equal("NOT_DIRECTORY"))
+			validateErr := rule.Validate(file)
+			Expect(validateErr).To(HaveOccurred())
+			Expect(validateErr.Code).To(Equal("NOT_DIRECTORY"))
 		})
 	})
 
@@ -387,8 +388,8 @@ var _ = Describe("ValidationRules", func() {
 		})
 
 		It("should validate minimum value", func() {
-			min := 10
-			rule := &NumberRule{Min: &min}
+			minValue := 10
+			rule := &NumberRule{Min: &minValue}
 			Expect(rule.Validate(15)).To(Succeed())
 
 			err := rule.Validate(5)
@@ -397,8 +398,8 @@ var _ = Describe("ValidationRules", func() {
 		})
 
 		It("should validate maximum value", func() {
-			max := 100
-			rule := &NumberRule{Max: &max}
+			maxValue := 100
+			rule := &NumberRule{Max: &maxValue}
 			Expect(rule.Validate(50)).To(Succeed())
 
 			err := rule.Validate(150)

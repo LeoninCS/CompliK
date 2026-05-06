@@ -15,6 +15,7 @@
 package config
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -189,7 +190,10 @@ func (l *Loader) loadRemoteConfigValue(
 		configType,
 	)
 
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create %s request: %w", configType, err)
 	}
@@ -204,6 +208,7 @@ func (l *Loader) loadRemoteConfigValue(
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+
 		return fmt.Errorf(
 			"request %s: status %d, body %s",
 			configType,

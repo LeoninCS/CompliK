@@ -24,6 +24,7 @@ import (
 
 	legacy "github.com/bearslyricattack/CompliK/procscan/pkg/logger/legacy"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -81,20 +82,50 @@ func createGRPCConnection() (*grpc.ClientConn, error) {
 
 	var lastErr error
 	for _, endpoint := range endpoints {
-		conn, err := grpc.Dial(
+		conn, err := grpc.NewClient(
 			endpoint,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
-			grpc.WithTimeout(5*time.Second),
 		)
-		if err == nil {
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if err := waitForConnectionReady(conn, 5*time.Second); err == nil {
 			legacy.L.WithField("endpoint", endpoint).
 				Info("Successfully connected to container runtime")
 			return conn, nil
 		}
 
-		lastErr = err
+		lastErr = fmt.Errorf("connection timeout for endpoint %s", endpoint)
+		if closeErr := conn.Close(); closeErr != nil {
+			legacy.L.WithError(closeErr).
+				WithField("endpoint", endpoint).
+				Debug("Failed to close unsuccessful runtime connection")
+		}
 	}
 
 	return nil, fmt.Errorf("failed to connect to any container runtime: %w", lastErr)
+}
+
+func waitForConnectionReady(conn *grpc.ClientConn, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	conn.Connect()
+
+	for {
+		state := conn.GetState()
+		if state == connectivity.Ready {
+			return nil
+		}
+
+		if state == connectivity.Shutdown {
+			return errors.New("runtime connection shut down")
+		}
+
+		if !conn.WaitForStateChange(ctx, state) {
+			return fmt.Errorf("runtime connection did not become ready from state %s", state)
+		}
+	}
 }

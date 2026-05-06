@@ -38,7 +38,6 @@ type Scanner struct {
 	config     *models.Config
 	processor  *processor.Processor
 	k8sClient  k8sClientInterface
-	notifier   notifierInterface
 	metrics    *metrics.Collector
 	metricsSrv *metrics.Server
 	mu         sync.RWMutex
@@ -48,12 +47,6 @@ type Scanner struct {
 // k8sClientInterface defines the interface for Kubernetes client operations
 type k8sClientInterface interface {
 	LabelNamespace(namespaceName string, labels map[string]string) error
-}
-
-// notifierInterface defines the interface for notification operations
-type notifierInterface interface {
-	SendThreatAlert(threat ThreatInfo) error
-	SendSimpleNotification(message string) error
 }
 
 // ThreatInfo represents threat information structure
@@ -217,7 +210,9 @@ func (s *Scanner) runScanLoop(ctx context.Context) error {
 			legacy.L.Info("Scanner stopped")
 
 			if s.metricsSrv != nil {
-				s.metricsSrv.Stop(ctx)
+				if err := s.metricsSrv.Stop(ctx); err != nil {
+					legacy.L.WithError(err).Warn("Failed to stop metrics server")
+				}
 			}
 
 			return ctx.Err()
@@ -229,10 +224,8 @@ func (s *Scanner) runScanLoop(ctx context.Context) error {
 				if s.metrics != nil {
 					s.metrics.RecordScanError()
 				}
-			} else {
-				if s.metrics != nil {
-					s.metrics.RecordScanComplete(time.Since(scanStart))
-				}
+			} else if s.metrics != nil {
+				s.metrics.RecordScanComplete(time.Since(scanStart))
 			}
 		}
 	}
@@ -263,10 +256,10 @@ func (s *Scanner) scanProcesses() error {
 
 	var wg sync.WaitGroup
 
-	for i := range numWorkers {
+	for range numWorkers {
 		wg.Add(1)
 
-		go func(workerID int) {
+		go func() {
 			defer wg.Done()
 
 			for pid := range pidChan {
@@ -275,7 +268,7 @@ func (s *Scanner) scanProcesses() error {
 					resultsChan <- processInfo
 				}
 			}
-		}(i)
+		}()
 	}
 
 	for _, pid := range pids {

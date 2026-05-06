@@ -15,6 +15,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	"github.com/bearslyricattack/CompliK/procscan/pkg/models"
@@ -157,7 +158,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			found := false
 			for _, warning := range result.Warnings {
-				if containsSubstring(warning, "Notification") {
+				if strings.Contains(warning, "Notification") {
 					found = true
 					break
 				}
@@ -197,7 +198,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			found := false
 			for _, warning := range result.Warnings {
-				if containsSubstring(warning, "too short") {
+				if strings.Contains(warning, "too short") {
 					found = true
 					break
 				}
@@ -227,7 +228,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			found := false
 			for _, warning := range result.Warnings {
-				if containsSubstring(warning, "both blacklist and whitelist") {
+				if strings.Contains(warning, "both blacklist and whitelist") {
 					found = true
 					break
 				}
@@ -271,7 +272,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			found := false
 			for _, warning := range result.Warnings {
-				if containsSubstring(warning, "proc_path") {
+				if strings.Contains(warning, "proc_path") {
 					found = true
 					break
 				}
@@ -300,7 +301,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			found := false
 			for _, warning := range result.Warnings {
-				if containsSubstring(warning, "Label functionality") {
+				if strings.Contains(warning, "Label functionality") {
 					found = true
 					break
 				}
@@ -320,18 +321,3 @@ var _ = Describe("ConfigValidator", func() {
 		})
 	})
 })
-
-// Helper function to check if a string contains a substring
-func containsSubstring(str, substr string) bool {
-	return len(str) >= len(substr) && findSubstring(str, substr)
-}
-
-func findSubstring(str, substr string) bool {
-	for i := 0; i <= len(str)-len(substr); i++ {
-		if str[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-
-	return false
-}

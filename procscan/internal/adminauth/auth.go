@@ -22,7 +22,7 @@ import (
 
 const (
 	UsernameEnv = "ADMIN_BASIC_AUTH_USERNAME"
-	PasswordEnv = "ADMIN_BASIC_AUTH_PASSWORD"
+	PasswordEnv = "ADMIN_BASIC_AUTH_PASSWORD" // #nosec G101 -- env var key for external credential lookup
 )
 
 type BasicAuth struct {

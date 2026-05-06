@@ -52,8 +52,15 @@ func NewK8sClient() (*kubernetes.Clientset, error) {
 			kubeconfig = filepath.Join(home, ".kube", "config")
 		}
 
+		kubeconfig = filepath.Clean(kubeconfig)
+		if !filepath.IsAbs(kubeconfig) {
+			return nil, fmt.Errorf("kubeconfig path must be absolute: %s", kubeconfig)
+		}
+
 		// Check if kubeconfig file exists
-		if _, err := os.Stat(kubeconfig); os.IsNotExist(err) {
+		if _, err := os.Stat(
+			kubeconfig,
+		); os.IsNotExist(err) { // #nosec G703 -- cleaned absolute kubeconfig path
 			return nil, fmt.Errorf(
 				"kubeconfig file not found at %s and in-cluster config not available",
 				kubeconfig,

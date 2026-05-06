@@ -18,6 +18,7 @@ package alert
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -108,14 +109,29 @@ func SendGlobalBatchAlert(results []*NamespaceScanResult, webhookURL, region str
 
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	resp, err := client.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		webhookURL,
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Lark request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Lark notification failed: HTTP status code %d", resp.StatusCode)
+		return fmt.Errorf("lark notification failed: HTTP status code %d", resp.StatusCode)
 	}
 
 	legacy.L.Info("Global Lark alert sent successfully")
@@ -156,28 +172,40 @@ func formatSummarySection(region, nodeName string, totalProcesses, namespaceCoun
 
 func formatNamespaceSection(index int, result *NamespaceScanResult) string {
 	namespace := displayValue(result.Namespace, "未知")
-
-	lines := []string{
+	analyses := buildLabelAnalysis(result.Namespace, result.LabelResult)
+	lines := make([]string, 0, len(analyses)+4)
+	lines = append(lines,
 		fmt.Sprintf("**命名空间分组 %d**", index),
-		"命名空间：" + quoteValue(namespace),
+		"命名空间："+quoteValue(namespace),
 		fmt.Sprintf("异常进程数量：`%d`", len(result.ProcessInfos)),
+		"处置状态："+quoteValue(getStatusText(result.LabelResult)),
+	)
+
+	for _, analysis := range analyses {
+		lines = append(lines, "分析建议："+analysis)
 	}
 
 	return strings.Join(lines, "\n")
 }
 
 func formatProcessSection(index int, info *models.ProcessInfo) string {
-	lines := []string{
+	analyses := buildProcessAnalysis(info)
+	lines := make([]string, 0, len(analyses)+10)
+	lines = append(lines,
 		fmt.Sprintf("**异常进程 %d**", index),
-		"发现时间：" + quoteValue(displayValue(info.Timestamp, "未知")),
-		"命名空间：" + quoteValue(displayValue(info.Namespace, "未知")),
-		"Pod 名称：" + quoteValue(displayValue(info.PodName, "未知")),
-		"容器 ID：" + quoteValue(displayValue(info.ContainerID, "未知")),
+		"发现时间："+quoteValue(displayValue(info.Timestamp, "未知")),
+		"命名空间："+quoteValue(displayValue(info.Namespace, "未知")),
+		"Pod 名称："+quoteValue(displayValue(info.PodName, "未知")),
+		"容器 ID："+quoteValue(displayValue(info.ContainerID, "未知")),
 		fmt.Sprintf("进程 PID：`%d`", info.PID),
-		"进程名称：" + quoteValue(displayValue(info.ProcessName, "未知")),
-		"进程命令行：" + quoteValue(displayValue(info.Command, "未知")),
-		"命中原因：" + translateReason(info.Message),
-		"原始匹配信息：" + quoteValue(displayValue(info.Message, "未返回")),
+		"进程名称："+quoteValue(displayValue(info.ProcessName, "未知")),
+		"进程命令行："+quoteValue(displayValue(info.Command, "未知")),
+		"命中原因："+translateReason(info.Message),
+		"原始匹配信息："+quoteValue(displayValue(info.Message, "未返回")),
+	)
+
+	for _, analysis := range analyses {
+		lines = append(lines, "研判建议："+analysis)
 	}
 
 	return strings.Join(lines, "\n")

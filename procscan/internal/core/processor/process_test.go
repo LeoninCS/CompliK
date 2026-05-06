@@ -352,11 +352,11 @@ var _ = Describe("Processor", func() {
 
 		It("should return list of PIDs from proc directory", func() {
 			// Create mock process directories
-			os.Mkdir(filepath.Join(tmpDir, "1234"), 0o755)
-			os.Mkdir(filepath.Join(tmpDir, "5678"), 0o755)
-			os.Mkdir(filepath.Join(tmpDir, "9999"), 0o755)
+			mustMkdir(filepath.Join(tmpDir, "1234"))
+			mustMkdir(filepath.Join(tmpDir, "5678"))
+			mustMkdir(filepath.Join(tmpDir, "9999"))
 			// Create non-numeric directory (should be ignored)
-			os.Mkdir(filepath.Join(tmpDir, "self"), 0o755)
+			mustMkdir(filepath.Join(tmpDir, "self"))
 
 			pids, err := processor.GetAllProcesses()
 			Expect(err).NotTo(HaveOccurred())
@@ -407,29 +407,11 @@ var _ = Describe("Processor", func() {
 		It("should extract container ID from cgroup with containerd", func() {
 			// Create mock PID directory
 			pidDir := filepath.Join(tmpDir, "1234")
-			os.Mkdir(pidDir, 0o755)
+			mustMkdir(pidDir)
 
-			// Create mock cgroup file
-			cgroupContent := `12:memory:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope
-11:cpu:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope`
-
-			// Note: the function reads from /proc/{pid}/cgroup, not from tmpDir
-			// So we need to create the file in the actual /proc location
-			// For testing, we'll need to mock this or create a test helper
-			cgroupPath := filepath.Join("/proc", "1234", "cgroup")
-			os.WriteFile(cgroupPath, []byte(cgroupContent), 0o644)
-
-			containerID := processor.getContainerIDFromPID(1234)
-
-			// Clean up if file was created
-			os.Remove(cgroupPath)
-
-			// This test will only work if we can write to /proc which is unlikely
-			// So we'll adjust the test to check the logic instead
-			if containerID != "" {
-				Expect(containerID).To(HaveLen(64))
-				Expect(isHexString(containerID)).To(BeTrue())
-			}
+			Skip(
+				"getContainerIDFromPID reads the live /proc filesystem; this needs an injectable cgroup reader",
+			)
 		})
 
 		It("should return empty string when cgroup file doesn't exist", func() {
@@ -440,7 +422,7 @@ var _ = Describe("Processor", func() {
 		It("should return empty string for non-container process", func() {
 			// Create mock cgroup without container info
 			pidDir := filepath.Join(tmpDir, "5678")
-			os.Mkdir(pidDir, 0o755)
+			mustMkdir(pidDir)
 
 			containerID := processor.getContainerIDFromPID(5678)
 			Expect(containerID).To(BeEmpty())

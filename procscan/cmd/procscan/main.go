@@ -64,7 +64,11 @@ func main() {
 			legacy.L.WithError(err).
 				Warn("Failed to start configuration watcher, hot-reload will be unavailable")
 		} else {
-			defer configWatcher.Stop()
+			defer func() {
+				if err := configWatcher.Stop(); err != nil {
+					legacy.L.WithError(err).Warn("Failed to stop configuration watcher")
+				}
+			}()
 		}
 	}
 
