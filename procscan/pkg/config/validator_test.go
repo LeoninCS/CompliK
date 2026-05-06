@@ -154,6 +154,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			result := validator.Validate(config)
 			Expect(result.Warnings).NotTo(BeEmpty())
+
 			found := false
 			for _, warning := range result.Warnings {
 				if containsSubstring(warning, "Notification") {
@@ -161,6 +162,7 @@ var _ = Describe("ConfigValidator", func() {
 					break
 				}
 			}
+
 			Expect(found).To(BeTrue())
 		})
 
@@ -192,6 +194,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			result := validator.Validate(config)
 			Expect(result.Warnings).NotTo(BeEmpty())
+
 			found := false
 			for _, warning := range result.Warnings {
 				if containsSubstring(warning, "too short") {
@@ -199,6 +202,7 @@ var _ = Describe("ConfigValidator", func() {
 					break
 				}
 			}
+
 			Expect(found).To(BeTrue())
 		})
 
@@ -220,6 +224,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			result := validator.Validate(config)
 			Expect(result.Warnings).NotTo(BeEmpty())
+
 			found := false
 			for _, warning := range result.Warnings {
 				if containsSubstring(warning, "both blacklist and whitelist") {
@@ -227,6 +232,7 @@ var _ = Describe("ConfigValidator", func() {
 					break
 				}
 			}
+
 			Expect(found).To(BeTrue())
 		})
 	})
@@ -262,6 +268,7 @@ var _ = Describe("ConfigValidator", func() {
 			}
 
 			result := validator.Validate(config)
+
 			found := false
 			for _, warning := range result.Warnings {
 				if containsSubstring(warning, "proc_path") {
@@ -269,6 +276,7 @@ var _ = Describe("ConfigValidator", func() {
 					break
 				}
 			}
+
 			Expect(found).To(BeTrue())
 		})
 	})
@@ -289,6 +297,7 @@ var _ = Describe("ConfigValidator", func() {
 
 			result := validator.Validate(config)
 			Expect(result.Warnings).NotTo(BeEmpty())
+
 			found := false
 			for _, warning := range result.Warnings {
 				if containsSubstring(warning, "Label functionality") {
@@ -296,6 +305,7 @@ var _ = Describe("ConfigValidator", func() {
 					break
 				}
 			}
+
 			Expect(found).To(BeTrue())
 		})
 	})
@@ -322,5 +332,6 @@ func findSubstring(str, substr string) bool {
 			return true
 		}
 	}
+
 	return false
 }

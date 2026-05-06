@@ -27,6 +27,7 @@ var _ = Describe("ProcessAnalyzer", func() {
 
 	BeforeEach(func() {
 		var err error
+
 		tmpDir, err = os.MkdirTemp("", "proc-analyzer-test-*")
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -39,7 +40,7 @@ var _ = Describe("ProcessAnalyzer", func() {
 		It("should parse status file correctly", func() {
 			// Create mock process directory
 			pidDir := filepath.Join(tmpDir, "1234")
-			err := os.Mkdir(pidDir, 0755)
+			err := os.Mkdir(pidDir, 0o755)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create mock status file
@@ -63,7 +64,7 @@ VmPeak:	   12345 kB
 VmSize:	   12345 kB`
 
 			statusPath := filepath.Join(pidDir, "status")
-			err = os.WriteFile(statusPath, []byte(statusContent), 0644)
+			err = os.WriteFile(statusPath, []byte(statusContent), 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			status, err := ReadProcessStatus(tmpDir, 1234)
@@ -81,7 +82,7 @@ VmSize:	   12345 kB`
 
 		It("should handle container main process with NSpid", func() {
 			pidDir := filepath.Join(tmpDir, "5678")
-			err := os.Mkdir(pidDir, 0755)
+			err := os.Mkdir(pidDir, 0o755)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Container main process has NSpid ending with 1
@@ -93,7 +94,7 @@ TracerPid:	0
 NSpid:	5678	1`
 
 			statusPath := filepath.Join(pidDir, "status")
-			err = os.WriteFile(statusPath, []byte(statusContent), 0644)
+			err = os.WriteFile(statusPath, []byte(statusContent), 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			status, err := ReadProcessStatus(tmpDir, 5678)
@@ -110,14 +111,14 @@ NSpid:	5678	1`
 
 		It("should handle minimal status file", func() {
 			pidDir := filepath.Join(tmpDir, "1111")
-			err := os.Mkdir(pidDir, 0755)
+			err := os.Mkdir(pidDir, 0o755)
 			Expect(err).NotTo(HaveOccurred())
 
 			statusContent := `Name:	test
 Pid:	1111`
 
 			statusPath := filepath.Join(pidDir, "status")
-			err = os.WriteFile(statusPath, []byte(statusContent), 0644)
+			err = os.WriteFile(statusPath, []byte(statusContent), 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			status, err := ReadProcessStatus(tmpDir, 1111)
@@ -180,7 +181,7 @@ Pid:	1111`
 		It("should find main process when direct", func() {
 			// Create main process
 			mainPidDir := filepath.Join(tmpDir, "1000")
-			err := os.Mkdir(mainPidDir, 0755)
+			err := os.Mkdir(mainPidDir, 0o755)
 			Expect(err).NotTo(HaveOccurred())
 
 			statusContent := `Name:	main
@@ -188,7 +189,7 @@ Pid:	1000
 PPid:	999
 NSpid:	1000	1`
 
-			err = os.WriteFile(filepath.Join(mainPidDir, "status"), []byte(statusContent), 0644)
+			err = os.WriteFile(filepath.Join(mainPidDir, "status"), []byte(statusContent), 0o644)
 			Expect(err).NotTo(HaveOccurred())
 
 			mainPID, err := FindContainerMainProcess(tmpDir, 1000)
@@ -199,21 +200,23 @@ NSpid:	1000	1`
 		It("should trace back to main process through parent", func() {
 			// Create main process (PID 1000)
 			mainPidDir := filepath.Join(tmpDir, "1000")
-			os.Mkdir(mainPidDir, 0755)
+			os.Mkdir(mainPidDir, 0o755)
+
 			mainStatus := `Name:	main
 Pid:	1000
 PPid:	999
 NSpid:	1000	1`
-			os.WriteFile(filepath.Join(mainPidDir, "status"), []byte(mainStatus), 0644)
+			os.WriteFile(filepath.Join(mainPidDir, "status"), []byte(mainStatus), 0o644)
 
 			// Create child process (PID 1001)
 			childPidDir := filepath.Join(tmpDir, "1001")
-			os.Mkdir(childPidDir, 0755)
+			os.Mkdir(childPidDir, 0o755)
+
 			childStatus := `Name:	child
 Pid:	1001
 PPid:	1000
 NSpid:	1001	42`
-			os.WriteFile(filepath.Join(childPidDir, "status"), []byte(childStatus), 0644)
+			os.WriteFile(filepath.Join(childPidDir, "status"), []byte(childStatus), 0o644)
 
 			mainPID, err := FindContainerMainProcess(tmpDir, 1001)
 			Expect(err).NotTo(HaveOccurred())
@@ -222,28 +225,31 @@ NSpid:	1001	42`
 
 		It("should handle multi-level parent chain", func() {
 			// Create grandparent (main process)
-			os.Mkdir(filepath.Join(tmpDir, "2000"), 0755)
+			os.Mkdir(filepath.Join(tmpDir, "2000"), 0o755)
+
 			gpStatus := `Name:	grandparent
 Pid:	2000
 PPid:	1999
 NSpid:	2000	1`
-			os.WriteFile(filepath.Join(tmpDir, "2000", "status"), []byte(gpStatus), 0644)
+			os.WriteFile(filepath.Join(tmpDir, "2000", "status"), []byte(gpStatus), 0o644)
 
 			// Create parent
-			os.Mkdir(filepath.Join(tmpDir, "2001"), 0755)
+			os.Mkdir(filepath.Join(tmpDir, "2001"), 0o755)
+
 			pStatus := `Name:	parent
 Pid:	2001
 PPid:	2000
 NSpid:	2001	10`
-			os.WriteFile(filepath.Join(tmpDir, "2001", "status"), []byte(pStatus), 0644)
+			os.WriteFile(filepath.Join(tmpDir, "2001", "status"), []byte(pStatus), 0o644)
 
 			// Create child
-			os.Mkdir(filepath.Join(tmpDir, "2002"), 0755)
+			os.Mkdir(filepath.Join(tmpDir, "2002"), 0o755)
+
 			cStatus := `Name:	child
 Pid:	2002
 PPid:	2001
 NSpid:	2002	20`
-			os.WriteFile(filepath.Join(tmpDir, "2002", "status"), []byte(cStatus), 0644)
+			os.WriteFile(filepath.Join(tmpDir, "2002", "status"), []byte(cStatus), 0o644)
 
 			mainPID, err := FindContainerMainProcess(tmpDir, 2002)
 			Expect(err).NotTo(HaveOccurred())
@@ -259,12 +265,13 @@ NSpid:	2002	20`
 		It("should return error when reaching init without finding main process", func() {
 			// Create a process with PPID 0 (init) but not a container main process
 			pidDir := filepath.Join(tmpDir, "3000")
-			os.Mkdir(pidDir, 0755)
+			os.Mkdir(pidDir, 0o755)
+
 			statusContent := `Name:	init
 Pid:	3000
 PPid:	0
 NSpid:	3000`
-			os.WriteFile(filepath.Join(pidDir, "status"), []byte(statusContent), 0644)
+			os.WriteFile(filepath.Join(pidDir, "status"), []byte(statusContent), 0o644)
 
 			_, err := FindContainerMainProcess(tmpDir, 3000)
 			Expect(err).To(HaveOccurred())
@@ -273,19 +280,21 @@ NSpid:	3000`
 
 		It("should detect circular reference", func() {
 			// Create two processes that reference each other (pathological case)
-			os.Mkdir(filepath.Join(tmpDir, "4000"), 0755)
+			os.Mkdir(filepath.Join(tmpDir, "4000"), 0o755)
+
 			status1 := `Name:	proc1
 Pid:	4000
 PPid:	4001
 NSpid:	4000	10`
-			os.WriteFile(filepath.Join(tmpDir, "4000", "status"), []byte(status1), 0644)
+			os.WriteFile(filepath.Join(tmpDir, "4000", "status"), []byte(status1), 0o644)
 
-			os.Mkdir(filepath.Join(tmpDir, "4001"), 0755)
+			os.Mkdir(filepath.Join(tmpDir, "4001"), 0o755)
+
 			status2 := `Name:	proc2
 Pid:	4001
 PPid:	4000
 NSpid:	4001	11`
-			os.WriteFile(filepath.Join(tmpDir, "4001", "status"), []byte(status2), 0644)
+			os.WriteFile(filepath.Join(tmpDir, "4001", "status"), []byte(status2), 0o644)
 
 			_, err := FindContainerMainProcess(tmpDir, 4000)
 			Expect(err).To(HaveOccurred())
@@ -303,7 +312,7 @@ NSpid:	4001	11`
 		It("should handle empty namespace directory", func() {
 			pidDir := filepath.Join(tmpDir, "5000")
 			nsDir := filepath.Join(pidDir, "ns")
-			err := os.MkdirAll(nsDir, 0755)
+			err := os.MkdirAll(nsDir, 0o755)
 			Expect(err).NotTo(HaveOccurred())
 
 			nsInfo, err := GetProcessNamespaceInfo(tmpDir, 5000)

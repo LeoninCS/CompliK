@@ -54,11 +54,15 @@ func compileRules(patterns []string) []*regexp.Regexp {
 	for _, pattern := range patterns {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
-			legacy.L.WithFields(logrus.Fields{"rule": pattern}).WithError(err).Warn("Invalid regex pattern, skipping")
+			legacy.L.WithFields(logrus.Fields{"rule": pattern}).
+				WithError(err).
+				Warn("Invalid regex pattern, skipping")
 			continue
 		}
+
 		regexps = append(regexps, re)
 	}
+
 	return regexps
 }
 
@@ -73,6 +77,7 @@ func NewProcessor(config *models.Config) *Processor {
 func (p *Processor) UpdateConfig(config *models.Config) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	rules := config.DetectionRules
 	p.rules = compiledRules{
 		blacklistProcesses:  compileRules(rules.Blacklist.Processes),
@@ -90,17 +95,21 @@ func (p *Processor) GetAllProcesses() ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s directory: %w", p.ProcPath, err)
 	}
+
 	pids := make([]int, 0, len(procDirs))
 	for _, dir := range procDirs {
 		if !dir.IsDir() {
 			continue
 		}
+
 		pid, err := strconv.Atoi(dir.Name())
 		if err != nil {
 			continue
 		}
+
 		pids = append(pids, pid)
 	}
+
 	return pids, nil
 }
 
@@ -112,6 +121,7 @@ func matchAny(text string, regexps []*regexp.Regexp) (bool, string) {
 			return true, re.String()
 		}
 	}
+
 	return false, ""
 }
 
@@ -120,15 +130,19 @@ func matchAny(text string, regexps []*regexp.Regexp) (bool, string) {
 func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 	procDir := filepath.Join(p.ProcPath, strconv.Itoa(pid))
 	cmdlineFile := filepath.Join(procDir, "cmdline")
+
 	cmdlineData, err := os.ReadFile(cmdlineFile)
 	if err != nil {
 		return nil, nil
 	}
+
 	cmdline := strings.ReplaceAll(string(cmdlineData), "\x00", " ")
+
 	cmdline = strings.TrimSpace(cmdline)
 	if cmdline == "" {
 		return nil, nil
 	}
+
 	processName := p.getProcessName(cmdline)
 
 	procLogger := legacy.L.WithFields(logrus.Fields{
@@ -146,6 +160,7 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 		procLogger.Debug("Process not in blacklist, skipping")
 		return nil, nil
 	}
+
 	procLogger.WithField("reason", message).Info("Process matched blacklist rule")
 
 	// Step 2: Check process whitelist
@@ -156,17 +171,20 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 
 	// Step 3: Identify container main process
 	mainProcessPID := pid
+
 	processStatus, err := ReadProcessStatus(p.ProcPath, pid)
 	if err != nil {
 		procLogger.WithError(err).Debug("Failed to read process status, using current PID")
 	} else {
 		if IsContainerMainProcess(processStatus) {
-			procLogger.WithField("main_process_pid", mainProcessPID).Info("Detected malicious process is container main process")
+			procLogger.WithField("main_process_pid", mainProcessPID).
+				Info("Detected malicious process is container main process")
 		} else {
 			// Trace back to find container main process
 			mainPID, err := FindContainerMainProcess(p.ProcPath, pid)
 			if err != nil {
-				procLogger.WithError(err).Debug("Failed to find container main process, continuing with current PID")
+				procLogger.WithError(err).
+					Debug("Failed to find container main process, continuing with current PID")
 			} else {
 				mainProcessPID = mainPID
 				procLogger.WithFields(logrus.Fields{
@@ -183,7 +201,9 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 	// Step 5: Query container info on-demand when container metadata is available.
 	var podName, namespace string
 	if containerID == "" {
-		procLogger.Debug("Unable to determine container ID, continue alerting without container metadata")
+		procLogger.Debug(
+			"Unable to determine container ID, continue alerting without container metadata",
+		)
 	} else {
 		podName, namespace, err = container.GetContainerInfo(containerID)
 		if err != nil {
@@ -191,6 +211,7 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 				"containerID": containerID,
 				"error":       err.Error(),
 			}).Debug("Failed to get container info, continue alerting without pod/namespace")
+
 			podName = ""
 			namespace = ""
 		}
@@ -202,6 +223,7 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 			"namespace": namespace,
 			"pod":       podName,
 		}).Info("Infrastructure matched whitelist")
+
 		return nil, nil
 	}
 
@@ -233,12 +255,15 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 func (p *Processor) isBlacklisted(processName, cmdline string) (bool, string) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+
 	if matched, rule := matchAny(processName, p.rules.blacklistProcesses); matched {
 		return true, fmt.Sprintf("进程名 '%s' 命中黑名单规则 '%s'", processName, rule)
 	}
+
 	if matched, rule := matchAny(cmdline, p.rules.blacklistKeywords); matched {
 		return true, fmt.Sprintf("命令行命中关键词黑名单规则 '%s'", rule)
 	}
+
 	return false, ""
 }
 
@@ -246,14 +271,16 @@ func (p *Processor) isBlacklisted(processName, cmdline string) (bool, string) {
 func (p *Processor) isProcessWhitelisted(processName, cmdline string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return matchAnyBool(processName, p.rules.whitelistProcesses) || matchAnyBool(cmdline, p.rules.whitelistCommands)
+	return matchAnyBool(processName, p.rules.whitelistProcesses) ||
+		matchAnyBool(cmdline, p.rules.whitelistCommands)
 }
 
 // isInfraWhitelisted checks if namespace or pod name is whitelisted
 func (p *Processor) isInfraWhitelisted(namespace, podName string) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return matchAnyBool(namespace, p.rules.whitelistNamespaces) || matchAnyBool(podName, p.rules.whitelistPodNames)
+	return matchAnyBool(namespace, p.rules.whitelistNamespaces) ||
+		matchAnyBool(podName, p.rules.whitelistPodNames)
 }
 
 // matchAnyBool is a simplified version of matchAny that only returns a boolean
@@ -263,6 +290,7 @@ func matchAnyBool(text string, regexps []*regexp.Regexp) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -272,23 +300,28 @@ func (p *Processor) getProcessName(cmdline string) string {
 	if len(parts) == 0 {
 		return ""
 	}
+
 	return filepath.Base(parts[0])
 }
 
 // getContainerIDFromPID extracts container ID from process cgroup information
 func (p *Processor) getContainerIDFromPID(pid int) string {
 	cgroupPath := fmt.Sprintf("/proc/%d/cgroup", pid)
+
 	content, err := os.ReadFile(cgroupPath)
 	if err != nil {
 		return ""
 	}
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "containerd") || strings.Contains(line, "docker") || strings.Contains(line, "kubepods") {
-			parts := strings.Split(line, "/")
-			for _, part := range parts {
+
+	lines := strings.SplitSeq(string(content), "\n")
+	for line := range lines {
+		if strings.Contains(line, "containerd") || strings.Contains(line, "docker") ||
+			strings.Contains(line, "kubepods") {
+			parts := strings.SplitSeq(line, "/")
+			for part := range parts {
 				if strings.HasPrefix(part, "cri-containerd-") && strings.HasSuffix(part, ".scope") {
 					containerID := strings.TrimPrefix(part, "cri-containerd-")
+
 					containerID = strings.TrimSuffix(containerID, ".scope")
 					if len(containerID) == 64 && isHexString(containerID) {
 						return containerID
@@ -297,6 +330,7 @@ func (p *Processor) getContainerIDFromPID(pid int) string {
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -307,6 +341,7 @@ func isHexString(s string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 

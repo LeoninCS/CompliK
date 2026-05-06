@@ -30,12 +30,14 @@ import (
 
 func main() {
 	configPath := flag.String("config", "", "path to configuration file")
+
 	flag.Parse()
 
 	legacy.L.Info("ProcScan is starting...")
 
 	// Load initial configuration
 	loader := config.NewLoader(*configPath)
+
 	cfg, err := loader.Load()
 	if err != nil {
 		legacy.L.Fatalf("Failed to load initial configuration: %v", err)
@@ -45,6 +47,7 @@ func main() {
 	if cfg.Scanner.LogLevel != "" {
 		legacy.SetLevel(cfg.Scanner.LogLevel)
 	}
+
 	legacy.L.Info("Initial configuration loaded successfully")
 
 	// Create scanner
@@ -53,11 +56,13 @@ func main() {
 	// Setup configuration watcher
 	configWatcher, err := config.NewWatcher(loader, s.UpdateConfig)
 	if err != nil {
-		legacy.L.WithError(err).Warn("Failed to create configuration watcher, hot-reload will be unavailable")
+		legacy.L.WithError(err).
+			Warn("Failed to create configuration watcher, hot-reload will be unavailable")
 	} else {
 		ctx := context.Background()
 		if err := configWatcher.Start(ctx); err != nil {
-			legacy.L.WithError(err).Warn("Failed to start configuration watcher, hot-reload will be unavailable")
+			legacy.L.WithError(err).
+				Warn("Failed to start configuration watcher, hot-reload will be unavailable")
 		} else {
 			defer configWatcher.Stop()
 		}

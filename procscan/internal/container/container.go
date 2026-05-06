@@ -18,6 +18,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,28 +32,41 @@ import (
 func GetContainerInfo(containerID string) (string, string, error) {
 	conn, err := createGRPCConnection()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create connection: %v", err)
+		return "", "", fmt.Errorf("failed to create connection: %w", err)
 	}
 	defer conn.Close()
+
 	client := runtimeapi.NewRuntimeServiceClient(conn)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
 	statusReq := &runtimeapi.ContainerStatusRequest{ContainerId: containerID}
+
 	statusResp, err := client.ContainerStatus(ctx, statusReq)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get container status: %v", err)
+		return "", "", fmt.Errorf("failed to get container status: %w", err)
 	}
-	if statusResp.Status == nil {
-		return "", "", fmt.Errorf("container status is empty")
+
+	if statusResp.GetStatus() == nil {
+		return "", "", errors.New("container status is empty")
 	}
-	podNamespace := statusResp.Status.GetLabels()["io.kubernetes.pod.namespace"]
-	podName := statusResp.Status.GetLabels()["io.kubernetes.pod.name"]
+
+	podNamespace := statusResp.GetStatus().GetLabels()["io.kubernetes.pod.namespace"]
+
+	podName := statusResp.GetStatus().GetLabels()["io.kubernetes.pod.name"]
 	if podName == "" {
-		return "", "", fmt.Errorf("cannot find pod name (io.kubernetes.pod.name) in container labels")
+		return "", "", errors.New(
+			"cannot find pod name (io.kubernetes.pod.name) in container labels",
+		)
 	}
+
 	if podNamespace == "" {
-		return "", "", fmt.Errorf("cannot find pod namespace (io.kubernetes.pod.namespace) in container labels")
+		return "", "", errors.New(
+			"cannot find pod namespace (io.kubernetes.pod.namespace) in container labels",
+		)
 	}
+
 	return podName, podNamespace, nil
 }
 
@@ -64,14 +78,23 @@ func createGRPCConnection() (*grpc.ClientConn, error) {
 		"unix:///var/run/crio/crio.sock",
 		"unix:///var/run/dockershim.sock",
 	}
+
 	var lastErr error
 	for _, endpoint := range endpoints {
-		conn, err := grpc.Dial(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithTimeout(5*time.Second))
+		conn, err := grpc.Dial(
+			endpoint,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+			grpc.WithTimeout(5*time.Second),
+		)
 		if err == nil {
-			legacy.L.WithField("endpoint", endpoint).Info("Successfully connected to container runtime")
+			legacy.L.WithField("endpoint", endpoint).
+				Info("Successfully connected to container runtime")
 			return conn, nil
 		}
+
 		lastErr = err
 	}
-	return nil, fmt.Errorf("failed to connect to any container runtime: %v", lastErr)
+
+	return nil, fmt.Errorf("failed to connect to any container runtime: %w", lastErr)
 }

@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -98,23 +99,31 @@ func (l *Loader) Load() (*models.Config, error) {
 func (l *Loader) loadAdminConfig(config *models.Config) error {
 	adminBaseURL := strings.TrimSpace(config.Notifications.Admin.BaseURL)
 	if adminBaseURL == "" {
-		return fmt.Errorf("notifications.admin.base_url is required")
+		return errors.New("notifications.admin.base_url is required")
 	}
+
 	auth := adminauth.FromValues(
 		config.Notifications.Admin.BasicAuth.Username,
 		config.Notifications.Admin.BasicAuth.Password,
 	)
 
-	notifications, err := l.loadRemoteNotificationsConfig(adminBaseURL, config.Notifications.Admin.Timeout, auth)
+	notifications, err := l.loadRemoteNotificationsConfig(
+		adminBaseURL,
+		config.Notifications.Admin.Timeout,
+		auth,
+	)
 	if err != nil {
 		return fmt.Errorf("load notifications config from admin: %w", err)
 	}
+
 	if notifications.Region == nil || strings.TrimSpace(*notifications.Region) == "" {
 		return fmt.Errorf("admin config %q missing region", procscanNotificationsConfigType)
 	}
+
 	if notifications.Webhook == nil || strings.TrimSpace(*notifications.Webhook) == "" {
 		return fmt.Errorf("admin config %q missing webhook", procscanNotificationsConfigType)
 	}
+
 	config.Notifications.Region = strings.TrimSpace(*notifications.Region)
 	config.Notifications.Lark.Webhook = strings.TrimSpace(*notifications.Webhook)
 
@@ -122,6 +131,7 @@ func (l *Loader) loadAdminConfig(config *models.Config) error {
 	if err != nil {
 		return fmt.Errorf("load detection rules config from admin: %w", err)
 	}
+
 	config.DetectionRules = *rules
 
 	return nil
@@ -133,9 +143,16 @@ func (l *Loader) loadRemoteNotificationsConfig(
 	auth adminauth.BasicAuth,
 ) (*remoteNotificationsConfig, error) {
 	var config remoteNotificationsConfig
-	if err := l.loadRemoteConfigValue(adminBaseURL, timeout, procscanNotificationsConfigType, &config, auth); err != nil {
+	if err := l.loadRemoteConfigValue(
+		adminBaseURL,
+		timeout,
+		procscanNotificationsConfigType,
+		&config,
+		auth,
+	); err != nil {
 		return nil, err
 	}
+
 	return &config, nil
 }
 
@@ -145,9 +162,16 @@ func (l *Loader) loadRemoteRulesConfig(
 	auth adminauth.BasicAuth,
 ) (*models.DetectionRules, error) {
 	var rules models.DetectionRules
-	if err := l.loadRemoteConfigValue(adminBaseURL, timeout, procscanRulesConfigType, &rules, auth); err != nil {
+	if err := l.loadRemoteConfigValue(
+		adminBaseURL,
+		timeout,
+		procscanRulesConfigType,
+		&rules,
+		auth,
+	); err != nil {
 		return nil, err
 	}
+
 	return &rules, nil
 }
 
@@ -158,11 +182,18 @@ func (l *Loader) loadRemoteConfigValue(
 	target any,
 	auth adminauth.BasicAuth,
 ) error {
-	endpoint := strings.TrimRight(adminBaseURL, "/") + "/api/configs/type/" + url.PathEscape(configType)
+	endpoint := strings.TrimRight(
+		adminBaseURL,
+		"/",
+	) + "/api/configs/type/" + url.PathEscape(
+		configType,
+	)
+
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create %s request: %w", configType, err)
 	}
+
 	auth.Apply(req)
 
 	resp, err := adminClient(timeout).Do(req)
@@ -173,13 +204,19 @@ func (l *Loader) loadRemoteConfigValue(
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("request %s: status %d, body %s", configType, resp.StatusCode, strings.TrimSpace(string(body)))
+		return fmt.Errorf(
+			"request %s: status %d, body %s",
+			configType,
+			resp.StatusCode,
+			strings.TrimSpace(string(body)),
+		)
 	}
 
 	var payloads []adminProjectConfigResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payloads); err != nil {
 		return fmt.Errorf("decode %s response: %w", configType, err)
 	}
+
 	if len(payloads) == 0 {
 		return fmt.Errorf("%s response is empty", configType)
 	}
@@ -191,6 +228,7 @@ func (l *Loader) loadRemoteConfigValue(
 	if len(payloads[0].ConfigValue) == 0 {
 		return fmt.Errorf("%s config value is empty", configType)
 	}
+
 	if err := json.Unmarshal(payloads[0].ConfigValue, target); err != nil {
 		return fmt.Errorf("decode %s config value: %w", configType, err)
 	}

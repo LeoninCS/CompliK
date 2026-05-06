@@ -82,7 +82,9 @@ func NewScanner(config *models.Config) *Scanner {
 	// Initialize Kubernetes client
 	k8sClientset, err := k8sClient.NewK8sClient()
 	if err != nil {
-		legacy.L.WithError(err).Warn("Failed to create K8s client, labeling feature will be unavailable")
+		legacy.L.WithError(err).
+			Warn("Failed to create K8s client, labeling feature will be unavailable")
+
 		k8sClientset = nil
 	}
 
@@ -121,12 +123,14 @@ func (s *Scanner) UpdateConfig(newConfig *models.Config) {
 	defer s.mu.Unlock()
 
 	legacy.L.Info("Applying new configuration...")
+
 	oldConfig := s.config
 	s.config = newConfig
 
 	if oldConfig.Scanner.LogLevel != newConfig.Scanner.LogLevel {
 		legacy.SetLevel(newConfig.Scanner.LogLevel)
 	}
+
 	if oldConfig.Actions.Label.Enabled != newConfig.Actions.Label.Enabled {
 		legacy.L.WithFields(logrus.Fields{
 			"key":  "actions.label.enabled",
@@ -136,11 +140,13 @@ func (s *Scanner) UpdateConfig(newConfig *models.Config) {
 	}
 
 	oldInterval := oldConfig.Scanner.ScanInterval
+
 	newInterval := newConfig.Scanner.ScanInterval
 	if oldInterval != newInterval {
 		if s.ticker != nil {
 			s.ticker.Reset(newInterval)
 		}
+
 		legacy.L.WithFields(logrus.Fields{
 			"key":  "scanner.scan_interval",
 			"from": oldInterval.String(),
@@ -177,6 +183,7 @@ func (s *Scanner) Start(ctx context.Context) error {
 	// Start metrics collector
 	if s.metrics != nil {
 		go s.metrics.StartMetricsUpdater(ctx, 30*time.Second)
+
 		s.metrics.RecordScanStart()
 	}
 
@@ -187,6 +194,7 @@ func (s *Scanner) Start(ctx context.Context) error {
 	if nodeName == "" {
 		nodeName = "unknown"
 	}
+
 	legacy.L.WithFields(logrus.Fields{
 		"node":     nodeName,
 		"interval": initialInterval.String(),
@@ -207,14 +215,17 @@ func (s *Scanner) runScanLoop(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			legacy.L.Info("Scanner stopped")
+
 			if s.metricsSrv != nil {
 				s.metricsSrv.Stop(ctx)
 			}
+
 			return ctx.Err()
 		case <-s.ticker.C:
 			scanStart := time.Now()
 			if err := s.scanProcesses(); err != nil {
 				legacy.L.WithError(err).Error("Failed to scan processes")
+
 				if s.metrics != nil {
 					s.metrics.RecordScanError()
 				}
@@ -238,6 +249,7 @@ func (s *Scanner) scanProcesses() error {
 	if err != nil {
 		return err
 	}
+
 	legacy.L.WithField("count", len(pids)).Info("Starting process analysis...")
 
 	// Record number of processes to analyze
@@ -248,12 +260,15 @@ func (s *Scanner) scanProcesses() error {
 	numWorkers := runtime.NumCPU()
 	pidChan := make(chan int, len(pids))
 	resultsChan := make(chan *models.ProcessInfo, len(pids))
+
 	var wg sync.WaitGroup
 
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		wg.Add(1)
+
 		go func(workerID int) {
 			defer wg.Done()
+
 			for pid := range pidChan {
 				processInfo, _ := s.processor.AnalyzeProcess(pid)
 				if processInfo != nil {
@@ -266,6 +281,7 @@ func (s *Scanner) scanProcesses() error {
 	for _, pid := range pids {
 		pidChan <- pid
 	}
+
 	close(pidChan)
 
 	wg.Wait()
@@ -274,7 +290,10 @@ func (s *Scanner) scanProcesses() error {
 
 	resultsByNamespace := make(map[string][]*models.ProcessInfo)
 	for processInfo := range resultsChan {
-		resultsByNamespace[processInfo.Namespace] = append(resultsByNamespace[processInfo.Namespace], processInfo)
+		resultsByNamespace[processInfo.Namespace] = append(
+			resultsByNamespace[processInfo.Namespace],
+			processInfo,
+		)
 	}
 
 	if len(resultsByNamespace) == 0 {
@@ -306,39 +325,52 @@ func (s *Scanner) scanProcesses() error {
 	}
 
 	if len(finalResults) > 0 {
-		if err := alert.SendGlobalBatchAlert(finalResults, currentConfig.Notifications.Lark.Webhook, currentConfig.Notifications.Region); err != nil {
+		if err := alert.SendGlobalBatchAlert(
+			finalResults,
+			currentConfig.Notifications.Lark.Webhook,
+			currentConfig.Notifications.Region,
+		); err != nil {
 			legacy.L.WithError(err).Error("Failed to send global batch Lark alert")
 		}
 	}
 
 	legacy.L.Info("Scan round completed")
+
 	return nil
 }
 
-func (s *Scanner) handleGroupedActions(namespace string, config *models.Config) (labelResult string) {
+func (s *Scanner) handleGroupedActions(
+	namespace string,
+	config *models.Config,
+) (labelResult string) {
 	if config.Actions.Label.Enabled {
 		if s.k8sClient != nil {
 			labels := config.Actions.Label.Data
 			if len(labels) == 0 {
 				labels = map[string]string{"clawcloud.run/status": "locked"}
 			}
+
 			legacy.L.WithFields(logrus.Fields{
 				"namespace": namespace,
 				"labels":    labels,
 			}).Info("Adding security labels to namespace")
+
 			if err := s.k8sClient.LabelNamespace(namespace, labels); err != nil {
 				legacy.L.WithFields(logrus.Fields{
 					"namespace": namespace,
 				}).WithError(err).Error("Failed to add security labels to namespace")
 				labelResult = fmt.Sprintf("Failed: %v", err)
+
 				if s.metrics != nil {
 					s.metrics.RecordLabelAction(false)
 				}
 			} else {
 				labelResult = "Success"
+
 				legacy.L.WithFields(logrus.Fields{
 					"namespace": namespace,
 				}).Info("Security labels added successfully, waiting for external controller to process")
+
 				if s.metrics != nil {
 					s.metrics.RecordLabelAction(true)
 				}
@@ -349,5 +381,6 @@ func (s *Scanner) handleGroupedActions(namespace string, config *models.Config) 
 	} else {
 		labelResult = "Feature disabled"
 	}
-	return
+
+	return labelResult
 }

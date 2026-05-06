@@ -70,6 +70,7 @@ func (c *Collector) RecordSuspiciousProcesses(count int, namespace string) {
 // RecordLabelAction records a label operation
 func (c *Collector) RecordLabelAction(success bool) {
 	LabelActionsTotal.Inc()
+
 	if success {
 		LabelActionsSuccessTotal.Inc()
 	}
@@ -125,13 +126,13 @@ func (c *Collector) ResetNamespaceMetrics(namespace string) {
 }
 
 // GetMetricsSummary gets a summary of metrics (for debugging)
-func (c *Collector) GetMetricsSummary() map[string]interface{} {
+func (c *Collector) GetMetricsSummary() map[string]any {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
 	// Note: This uses simple counter states and cannot get precise current values
 	// In actual use, metrics should be retrieved via Prometheus HTTP interface
-	return map[string]interface{}{
+	return map[string]any{
 		"uptime_seconds":       time.Since(c.startTime).Seconds(),
 		"memory_usage_bytes":   m.Alloc,
 		"goroutines_count":     runtime.NumGoroutine(),

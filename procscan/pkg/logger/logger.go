@@ -73,12 +73,12 @@ func Fatal(msg string) {
 }
 
 // WithField adds a single field to the log entry
-func WithField(key string, value interface{}) *logrus.Logger {
+func WithField(key string, value any) *logrus.Logger {
 	return GetLogger().WithField(key, value)
 }
 
 // WithFields adds multiple fields to the log entry
-func WithFields(fields map[string]interface{}) *logrus.Logger {
+func WithFields(fields map[string]any) *logrus.Logger {
 	return GetLogger().WithFields(fields)
 }
 

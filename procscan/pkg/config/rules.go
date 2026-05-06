@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ type StringRule struct {
 	Pattern   *regexp.Regexp
 }
 
-func (r *StringRule) Validate(value interface{}) *ValidationError {
+func (r *StringRule) Validate(value any) *ValidationError {
 	str, ok := value.(string)
 	if !ok {
 		return &ValidationError{
@@ -87,7 +88,7 @@ func (r *StringRule) Validate(value interface{}) *ValidationError {
 // BooleanRule validates boolean values
 type BooleanRule struct{}
 
-func (r *BooleanRule) Validate(value interface{}) *ValidationError {
+func (r *BooleanRule) Validate(value any) *ValidationError {
 	_, ok := value.(bool)
 	if !ok {
 		return &ValidationError{
@@ -96,6 +97,7 @@ func (r *BooleanRule) Validate(value interface{}) *ValidationError {
 			Value:   value,
 		}
 	}
+
 	return nil
 }
 
@@ -105,7 +107,7 @@ type DurationRule struct {
 	Max time.Duration
 }
 
-func (r *DurationRule) Validate(value interface{}) *ValidationError {
+func (r *DurationRule) Validate(value any) *ValidationError {
 	duration, ok := value.(time.Duration)
 	if !ok {
 		return &ValidationError{
@@ -140,7 +142,7 @@ type EnumRule struct {
 	CaseSensitive bool
 }
 
-func (r *EnumRule) Validate(value interface{}) *ValidationError {
+func (r *EnumRule) Validate(value any) *ValidationError {
 	str, ok := value.(string)
 	if !ok {
 		return &ValidationError{
@@ -156,7 +158,7 @@ func (r *EnumRule) Validate(value interface{}) *ValidationError {
 				return nil
 			}
 		} else {
-			if strings.ToLower(str) == strings.ToLower(allowed) {
+			if strings.EqualFold(str, allowed) {
 				return nil
 			}
 		}
@@ -175,7 +177,7 @@ type URLRule struct {
 	AllowEmpty      bool
 }
 
-func (r *URLRule) Validate(value interface{}) *ValidationError {
+func (r *URLRule) Validate(value any) *ValidationError {
 	str, ok := value.(string)
 	if !ok {
 		return &ValidationError{
@@ -189,6 +191,7 @@ func (r *URLRule) Validate(value interface{}) *ValidationError {
 		if r.AllowEmpty {
 			return nil
 		}
+
 		return &ValidationError{
 			Code:    "REQUIRED",
 			Message: "URL cannot be empty",
@@ -206,13 +209,8 @@ func (r *URLRule) Validate(value interface{}) *ValidationError {
 	}
 
 	if len(r.RequiredSchemes) > 0 {
-		schemeValid := false
-		for _, scheme := range r.RequiredSchemes {
-			if parsedURL.Scheme == scheme {
-				schemeValid = true
-				break
-			}
-		}
+		schemeValid := slices.Contains(r.RequiredSchemes, parsedURL.Scheme)
+
 		if !schemeValid {
 			return &ValidationError{
 				Code:    "INVALID_SCHEME",
@@ -231,7 +229,7 @@ type PathRule struct {
 	IsDir     bool
 }
 
-func (r *PathRule) Validate(value interface{}) *ValidationError {
+func (r *PathRule) Validate(value any) *ValidationError {
 	str, ok := value.(string)
 	if !ok {
 		return &ValidationError{
@@ -263,6 +261,7 @@ func (r *PathRule) Validate(value interface{}) *ValidationError {
 				Value:   value,
 			}
 		}
+
 		if err != nil {
 			return &ValidationError{
 				Code:    "ACCESS_ERROR",
@@ -286,7 +285,7 @@ func (r *PathRule) Validate(value interface{}) *ValidationError {
 // RegexRule validates regular expression values
 type RegexRule struct{}
 
-func (r *RegexRule) Validate(value interface{}) *ValidationError {
+func (r *RegexRule) Validate(value any) *ValidationError {
 	str, ok := value.(string)
 	if !ok {
 		return &ValidationError{
@@ -320,7 +319,7 @@ type SliceRule struct {
 	AllowEmpty  bool
 }
 
-func (r *SliceRule) Validate(value interface{}) *ValidationError {
+func (r *SliceRule) Validate(value any) *ValidationError {
 	slice, ok := value.([]string)
 	if !ok {
 		return &ValidationError{
@@ -338,6 +337,7 @@ func (r *SliceRule) Validate(value interface{}) *ValidationError {
 				Value:   value,
 			}
 		}
+
 		return nil
 	}
 
@@ -375,7 +375,7 @@ type PortRule struct {
 	MaxPort int
 }
 
-func (r *PortRule) Validate(value interface{}) *ValidationError {
+func (r *PortRule) Validate(value any) *ValidationError {
 	var port int
 
 	switch v := value.(type) {
@@ -390,6 +390,7 @@ func (r *PortRule) Validate(value interface{}) *ValidationError {
 				Value:   value,
 			}
 		}
+
 		port = parsed
 	default:
 		return &ValidationError{
@@ -433,7 +434,7 @@ type NumberRule struct {
 	Required bool
 }
 
-func (r *NumberRule) Validate(value interface{}) *ValidationError {
+func (r *NumberRule) Validate(value any) *ValidationError {
 	var num int
 
 	switch v := value.(type) {
@@ -448,6 +449,7 @@ func (r *NumberRule) Validate(value interface{}) *ValidationError {
 				Value:   value,
 			}
 		}
+
 		num = parsed
 	default:
 		return &ValidationError{
