@@ -130,7 +130,7 @@ func (r *ContentReviewer) prepareRequestData(
 
 	var prompt string
 	switch {
-	case customRules != nil && len(customRules) > 0:
+	case len(customRules) > 0:
 		prompt = r.buildCustomPrompt(htmlContent, customRules)
 	case strings.TrimSpace(safetyPrompt) != "":
 		prompt = r.buildSafetyPromptFromRules(htmlContent, safetyPrompt)
@@ -169,6 +169,7 @@ func (r *ContentReviewer) buildSafetyPromptFromRules(
 	safetyPrompt string,
 ) string {
 	htmlBlock := "```html\n" + htmlContent + "\n```"
+
 	return fmt.Sprintf(`# Role: Content Analysis and Compliance Checker
 
 # Goal:
@@ -257,6 +258,7 @@ func (r *ContentReviewer) buildRulesDescription(rules []CustomKeywordRule) strin
 				return false
 			}
 		})
+
 		cleanedKeywords := make([]string, 0, len(keywords))
 		for _, keyword := range keywords {
 			trimmed := strings.TrimSpace(keyword)
@@ -264,15 +266,23 @@ func (r *ContentReviewer) buildRulesDescription(rules []CustomKeywordRule) strin
 				cleanedKeywords = append(cleanedKeywords, trimmed)
 			}
 		}
+
 		ruleType := strings.TrimSpace(rule.Type)
 		if ruleType == "" {
 			ruleType = "custom"
 		}
+
 		description := strings.TrimSpace(rule.Description)
 		if description == "" {
 			description = ruleType + "关键词检测规则"
 		}
-		ruleText := fmt.Sprintf("类型: %s\n说明: %s\n关键词: %s\n", ruleType, description, strings.Join(cleanedKeywords, ", "))
+
+		ruleText := fmt.Sprintf(
+			"类型: %s\n说明: %s\n关键词: %s\n",
+			ruleType,
+			description,
+			strings.Join(cleanedKeywords, ", "),
+		)
 
 		builder.WriteString(ruleText)
 		builder.WriteString("\n")

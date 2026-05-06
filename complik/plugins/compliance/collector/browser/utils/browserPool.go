@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -205,9 +206,11 @@ func configuredBrowserBin(log logger.Logger) string {
 		if value == "" {
 			continue
 		}
+
 		if browserBin, ok := usableBrowserBin(value); ok {
 			return browserBin
 		}
+
 		if log != nil {
 			log.Warn("Configured browser binary is not usable", logger.Fields{
 				"env":         name,
@@ -241,13 +244,22 @@ func usableBrowserBin(candidate string) (string, bool) {
 		if err != nil {
 			return "", false
 		}
+
 		return path, true
 	}
 
-	info, err := os.Stat(candidate)
-	if err != nil || info.IsDir() || info.Mode().Perm()&0111 == 0 {
+	candidate = filepath.Clean(candidate)
+	if !filepath.IsAbs(candidate) {
 		return "", false
 	}
+
+	info, err := os.Stat(
+		candidate,
+	) // #nosec G703 -- candidate is a cleaned absolute browser binary path
+	if err != nil || info.IsDir() || info.Mode().Perm()&0o111 == 0 {
+		return "", false
+	}
+
 	return candidate, true
 }
 
