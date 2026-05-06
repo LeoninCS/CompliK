@@ -48,7 +48,9 @@ func createDatabase(cfg config.DatabaseConfig) error {
 	if err != nil {
 		return fmt.Errorf("connect mysql server: %w", err)
 	}
-	defer closeDB(db)
+	defer func() {
+		_ = closeDB(db)
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 	defer cancel()

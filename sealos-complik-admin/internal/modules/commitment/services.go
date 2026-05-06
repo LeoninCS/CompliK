@@ -160,7 +160,9 @@ func (s *Service) UploadCommitment(ctx context.Context, namespace string, fileHe
 	if err != nil {
 		return nil, fmt.Errorf("open uploaded file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	objectKey := s.buildObjectKey(trimmedNamespace, fileHeader.Filename)
 	fileURL, err := s.uploader.Upload(ctx, objectKey, file, pdfContentType)

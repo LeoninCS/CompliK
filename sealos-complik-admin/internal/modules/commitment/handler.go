@@ -165,7 +165,9 @@ func (h *Handler) DownloadCommitment(c *gin.Context) {
 		h.respondWithServiceError(c, err, "failed to download commitment")
 		return
 	}
-	defer file.Reader.Close()
+	defer func() {
+		_ = file.Reader.Close()
+	}()
 
 	c.Header("Content-Type", file.ContentType)
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename*=UTF-8''%s", url.QueryEscape(file.FileName)))

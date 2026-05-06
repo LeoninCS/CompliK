@@ -162,7 +162,9 @@ func (h *Handler) PreviewScreenshot(c *gin.Context) {
 		h.respondWithServiceError(c, err, "failed to preview ban screenshot")
 		return
 	}
-	defer file.Reader.Close()
+	defer func() {
+		_ = file.Reader.Close()
+	}()
 
 	c.Header("Content-Type", file.ContentType)
 	c.Header("Content-Disposition", fmt.Sprintf("inline; filename*=UTF-8''%s", url.QueryEscape(file.FileName)))
