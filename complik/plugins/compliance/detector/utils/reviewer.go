@@ -183,6 +183,10 @@ func (r *ContentReviewer) buildSafetyPromptFromRules(
 # Important Notes:
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code.
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+Output language requirements:
+- description must be Simplified Chinese.
+- keywords must be English keywords.
+- compliance.explanation must be Simplified Chinese and should state the violated category and concrete evidence.
 
 # HTML Code Excerpt:
 %s
@@ -191,11 +195,11 @@ If the page shows 404 errors, various errors, blank pages, or missing resources,
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<Generated webpage description>",
+  "description": "<简体中文网页描述>",
   "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<Brief explanation listing specific violated categories and evidence>"
+    "explanation": "<简体中文违规依据，说明违规类型、命中内容和具体证据>"
   }
 }`, strings.TrimSpace(safetyPrompt), htmlBlock)
 }
@@ -230,6 +234,10 @@ Pay special attention to social platforms like Weibo, WeChat, Douyin, Kuaishou, 
 
 ## Special Reminder
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+Output language requirements:
+- description must be Simplified Chinese.
+- keywords must be English keywords.
+- compliance.explanation must be Simplified Chinese and should state the violated category and concrete evidence.
 
 # HTML Code Excerpt:
 ` + "```html\n" + htmlContent + "\n```" + `
@@ -238,11 +246,11 @@ If the page shows 404 errors, various errors, blank pages, or missing resources,
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<Generated webpage description>",
+  "description": "<简体中文网页描述>",
   "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<Brief explanation listing specific violated categories and evidence>"
+    "explanation": "<简体中文违规依据，说明违规类型、命中内容和具体证据>"
   }
 }`
 }
@@ -307,10 +315,11 @@ Conduct a comprehensive analysis of the provided webpage content, focusing on de
 ## 1. Content Description
 - Based on HTML code analysis, provide a one-sentence concise summary of the webpage's main content or purpose
 - The description should be accurate, objective, and no more than 50 characters
+- The description must be written in Simplified Chinese
 
 ## 2. Keyword Extraction
 - Extract keywords that best represent the webpage content
-- Multiple keywords separated by commas, up to 5
+- Output keywords as a JSON array of English strings, up to 5 items
 - Keywords should accurately reflect the core content of the webpage
 
 ## 3. Custom Rule Detection
@@ -329,20 +338,28 @@ Please strictly detect according to the following custom rules:
 # Important Notes:
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code. Stay vigilant; even seemingly normal websites may hide non-compliant content in the code.
 If the page shows access errors, is blank, or resources do not exist, it should be considered compliant.
+Output language requirements:
+- description must be Simplified Chinese.
+- keywords must be English keywords.
+- compliance.explanation must be Simplified Chinese and should state the matched custom rule type, matched keywords, and concrete evidence.
 
 # Output Requirements:
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "is_compliant": true,
-  "keywords": "keyword1,keyword2,keyword3",
-  "description": "One-sentence description of webpage content"
+  "description": "<简体中文网页描述>",
+  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "compliance": {
+    "is_illegal": "<Yes/No>",
+    "explanation": "<简体中文违规依据，说明命中的自定义规则类型、关键词和具体证据>"
+  }
 }
 
 Notes:
-- is_compliant: true indicates compliant content, false indicates non-compliant content found
-- keywords: Multiple keywords separated by commas
-- description: Concise one-sentence description`, rulesDescription, htmlContent)
+- compliance.is_illegal: Yes indicates non-compliant content found, No indicates compliant content
+- keywords: Up to 5 English keywords as a JSON array
+- description: Concise one-sentence Simplified Chinese description
+- compliance.explanation: Simplified Chinese explanation of matched rule types, matched keywords, and evidence`, rulesDescription, htmlContent)
 }
 
 func (r *ContentReviewer) callAPI(
@@ -525,7 +542,7 @@ var ReviewResultSchema = map[string]any{
 			"properties": map[string]any{
 				"description": map[string]any{
 					"type":        "string",
-					"description": "Brief description of webpage content, one sentence summarizing the main content or purpose",
+					"description": "Simplified Chinese one-sentence description of webpage content or purpose",
 				},
 				"keywords": map[string]any{
 					"type": "array",
@@ -533,7 +550,7 @@ var ReviewResultSchema = map[string]any{
 						"type": "string",
 					},
 					"maxItems":    5,
-					"description": "Keywords most relevant to webpage content, up to 5",
+					"description": "English keywords most relevant to webpage content, up to 5",
 				},
 				"compliance": map[string]any{
 					"type": "object",
@@ -545,7 +562,7 @@ var ReviewResultSchema = map[string]any{
 						},
 						"explanation": map[string]any{
 							"type":        "string",
-							"description": "Brief explanation listing specific violated categories and evidence",
+							"description": "Simplified Chinese explanation listing violated categories, matched keywords, and concrete evidence",
 						},
 					},
 					"required": []string{
