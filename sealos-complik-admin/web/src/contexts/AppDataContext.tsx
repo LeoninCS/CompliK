@@ -126,7 +126,6 @@ type DisposalAction = {
   tone: ActivityItem["tone"];
   sortTime: number;
   sequence: number;
-  active: boolean;
 };
 
 function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
@@ -141,7 +140,6 @@ function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
       tone: "warn" as const,
       sortTime: getTimeMs(item.createdAtMs, item.createdAt),
       sequence: item.apiId * 2,
-      active: item.active,
     })),
     ...unbans.map((item) => ({
       id: `timeline-${item.id}`,
@@ -153,7 +151,6 @@ function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
       tone: "success" as const,
       sortTime: getTimeMs(item.createdAtMs, item.createdAt),
       sequence: item.apiId * 2 + 1,
-      active: false,
     })),
   ];
 
@@ -166,7 +163,7 @@ function isNamespaceBanned(namespace: string, bans: BanRecord[], unbans: UnbanRe
     unbans.filter((item) => item.namespace === namespace),
   )[0];
 
-  return Boolean(latestAction?.kind === "ban" && latestAction.active);
+  return latestAction?.kind === "ban";
 }
 
 function buildStats(violations: ViolationRecord[], bans: BanRecord[], unbans: UnbanRecord[]): StatCardItem[] {
@@ -336,7 +333,7 @@ function buildNamespaceProfiles(
     return {
       namespace,
       violated: namespaceViolations.length > 0,
-      banned: Boolean(latestDisposalAction?.kind === "ban" && latestDisposalAction.active),
+      banned: latestDisposalAction?.kind === "ban",
       commitmentUploaded: Boolean(namespaceCommitment),
       lastActionAt,
       commitment: namespaceCommitment

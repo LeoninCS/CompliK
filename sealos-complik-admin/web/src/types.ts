@@ -116,7 +116,6 @@ export type BanRecord = {
   createdAt: string;
   createdAtMs: number;
   updatedAt: string;
-  active: boolean;
 };
 
 export type UnbanRecord = {

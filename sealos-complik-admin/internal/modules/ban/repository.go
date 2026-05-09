@@ -17,11 +17,9 @@ type Repository struct {
 }
 
 type banStatusAction struct {
-	Kind         string
-	ID           uint64
-	CreatedAt    time.Time
-	BanStartTime *time.Time
-	BanEndTime   *time.Time
+	Kind      string
+	ID        uint64
+	CreatedAt time.Time
 }
 
 func NewRepository(db *gorm.DB) *Repository {
@@ -92,15 +90,7 @@ func (r *Repository) HasActiveBan(
 		return false, err
 	}
 
-	if action.Kind != banStatusActionBan || action.BanStartTime == nil {
-		return false, nil
-	}
-
-	if action.BanStartTime.After(now) {
-		return false, nil
-	}
-
-	return action.BanEndTime == nil || !action.BanEndTime.Before(now), nil
+	return action.Kind == banStatusActionBan, nil
 }
 
 func (r *Repository) getLatestBanStatusAction(
@@ -110,17 +100,17 @@ func (r *Repository) getLatestBanStatusAction(
 	var action banStatusAction
 	if err := r.db.WithContext(ctx).
 		Raw(`
-SELECT kind, id, created_at, ban_start_time, ban_end_time
+SELECT kind, id, created_at
 FROM (
-	SELECT ? AS kind, id, created_at, ban_start_time, ban_end_time
+	SELECT ? AS kind, id, created_at, 0 AS action_rank
 	FROM bans
 	WHERE namespace = ?
 	UNION ALL
-	SELECT ? AS kind, id, created_at, NULL AS ban_start_time, NULL AS ban_end_time
+	SELECT ? AS kind, id, created_at, 1 AS action_rank
 	FROM unbans
 	WHERE namespace = ?
 ) AS actions
-ORDER BY created_at DESC, id DESC
+ORDER BY created_at DESC, action_rank DESC, id DESC
 LIMIT 1
 `, banStatusActionBan, namespace, banStatusActionUnban, namespace).
 		Scan(&action).Error; err != nil {

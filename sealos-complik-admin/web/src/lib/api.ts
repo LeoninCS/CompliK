@@ -190,9 +190,7 @@ function toCommitmentRecord(item: CommitmentDto): CommitmentRecord {
 }
 
 function toBanRecord(item: BanDto): BanRecord {
-  const now = Date.now();
   const startAt = new Date(item.ban_start_time).getTime();
-  const endAt = item.ban_end_time ? new Date(item.ban_end_time).getTime() : null;
 
   return {
     id: `ban-${item.id}`,
@@ -207,7 +205,6 @@ function toBanRecord(item: BanDto): BanRecord {
     createdAt: formatDateTime(item.created_at),
     createdAtMs: new Date(item.created_at).getTime(),
     updatedAt: formatDateTime(item.updated_at),
-    active: !Number.isNaN(startAt) && startAt <= now && (endAt === null || endAt >= now),
   };
 }
 
