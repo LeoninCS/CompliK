@@ -100,18 +100,89 @@ function describeBanRecord(item: BanRecord) {
   return details.join("，");
 }
 
+function getTimeMs(value: number | null | undefined, fallback: string) {
+  return typeof value === "number" && Number.isFinite(value) ? value : toTimestamp(fallback);
+}
+
+function compareNewestFirst(
+  a: { sortTime: number; sequence: number },
+  b: { sortTime: number; sequence: number },
+) {
+  const timeDiff = b.sortTime - a.sortTime;
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  return b.sequence - a.sequence;
+}
+
+type DisposalAction = {
+  id: string;
+  namespace: string;
+  kind: "ban" | "unban";
+  title: string;
+  description: string;
+  time: string;
+  tone: ActivityItem["tone"];
+  sortTime: number;
+  sequence: number;
+  active: boolean;
+};
+
+function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
+  const actions: DisposalAction[] = [
+    ...bans.map((item) => ({
+      id: `timeline-${item.id}`,
+      namespace: item.namespace,
+      kind: "ban" as const,
+      title: "新增封禁记录",
+      description: describeBanRecord(item),
+      time: item.createdAt,
+      tone: "warn" as const,
+      sortTime: getTimeMs(item.createdAtMs, item.createdAt),
+      sequence: item.apiId * 2,
+      active: item.active,
+    })),
+    ...unbans.map((item) => ({
+      id: `timeline-${item.id}`,
+      namespace: item.namespace,
+      kind: "unban" as const,
+      title: "新增解封记录",
+      description: `操作人 ${item.operatorName}`,
+      time: item.createdAt,
+      tone: "success" as const,
+      sortTime: getTimeMs(item.createdAtMs, item.createdAt),
+      sequence: item.apiId * 2 + 1,
+      active: false,
+    })),
+  ];
+
+  return actions.sort(compareNewestFirst);
+}
+
+function isNamespaceBanned(namespace: string, bans: BanRecord[], unbans: UnbanRecord[]) {
+  const latestAction = buildDisposalActions(
+    bans.filter((item) => item.namespace === namespace),
+    unbans.filter((item) => item.namespace === namespace),
+  )[0];
+
+  return Boolean(latestAction?.kind === "ban" && latestAction.active);
+}
+
 function buildStats(violations: ViolationRecord[], bans: BanRecord[], unbans: UnbanRecord[]): StatCardItem[] {
   const violationNamespaces = new Set(violations.map((item) => item.namespace));
-  const now = Date.now();
+  const actionNamespaces = new Set<string>();
+  bans.forEach((item) => actionNamespaces.add(item.namespace));
+  unbans.forEach((item) => actionNamespaces.add(item.namespace));
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayStartTime = todayStart.getTime();
 
-  const todayViolationCount = violations.filter((item) => toTimestamp(item.detectedAt) >= todayStartTime).length;
+  const todayViolationCount = violations.filter((item) => getTimeMs(item.detectedAtMs, item.detectedAt) >= todayStartTime).length;
   const todayActionCount =
-    bans.filter((item) => toTimestamp(item.createdAt) >= todayStartTime).length +
-    unbans.filter((item) => toTimestamp(item.createdAt) >= todayStartTime).length;
-  const activeBanCount = bans.filter((item) => item.active && toTimestamp(item.banStartTime) <= now).length;
+    bans.filter((item) => getTimeMs(item.createdAtMs, item.createdAt) >= todayStartTime).length +
+    unbans.filter((item) => getTimeMs(item.createdAtMs, item.createdAt) >= todayStartTime).length;
+  const activeBanCount = [...actionNamespaces].filter((namespace) => isNamespaceBanned(namespace, bans, unbans)).length;
 
   return [
     {
@@ -127,7 +198,7 @@ function buildStats(violations: ViolationRecord[], bans: BanRecord[], unbans: Un
       value: String(activeBanCount),
       delta: `${bans.length} 条封禁记录`,
       tone: "warn",
-      description: "按当前仍处于有效期内的封禁记录统计。",
+      description: "按最新封禁或解封动作后的当前状态统计。",
       targetPath: "/bans",
     },
     {
@@ -151,7 +222,7 @@ function buildStats(violations: ViolationRecord[], bans: BanRecord[], unbans: Un
 
 function buildLatestViolations(violations: ViolationRecord[]): ActivityItem[] {
   return [...violations]
-    .sort((a, b) => toTimestamp(b.detectedAt) - toTimestamp(a.detectedAt))
+    .sort((a, b) => getTimeMs(b.detectedAtMs, b.detectedAt) - getTimeMs(a.detectedAtMs, a.detectedAt))
     .slice(0, 3)
     .map((item) => ({
       id: item.id,
@@ -171,7 +242,7 @@ function buildLatestActions(
   unbans: UnbanRecord[],
   commitments: CommitmentRecord[],
 ): ActivityItem[] {
-  const actions: Array<ActivityItem & { sortTime: number }> = [
+  const actions: Array<ActivityItem & { sortTime: number; sequence: number }> = [
     ...bans.map((item) => ({
       id: item.id,
       namespace: item.namespace,
@@ -179,7 +250,8 @@ function buildLatestActions(
       time: item.createdAt,
       tone: "warn" as const,
       targetPath: "/bans",
-      sortTime: toTimestamp(item.createdAt),
+      sortTime: getTimeMs(item.createdAtMs, item.createdAt),
+      sequence: item.apiId * 2,
     })),
     ...unbans.map((item) => ({
       id: item.id,
@@ -188,7 +260,8 @@ function buildLatestActions(
       time: item.createdAt,
       tone: "success" as const,
       targetPath: "/unbans",
-      sortTime: toTimestamp(item.createdAt),
+      sortTime: getTimeMs(item.createdAtMs, item.createdAt),
+      sequence: item.apiId * 2 + 1,
     })),
     ...commitments.map((item) => ({
       id: item.id,
@@ -197,14 +270,15 @@ function buildLatestActions(
       time: item.updatedAt,
       tone: "info" as const,
       targetPath: "/commitments",
-      sortTime: toTimestamp(item.updatedAt),
+      sortTime: getTimeMs(item.updatedAtMs, item.updatedAt),
+      sequence: getTimeMs(item.updatedAtMs, item.updatedAt),
     })),
   ];
 
   return actions
-    .sort((a, b) => b.sortTime - a.sortTime)
+    .sort(compareNewestFirst)
     .slice(0, 3)
-    .map(({ sortTime: _sortTime, ...item }) => item);
+    .map(({ sortTime: _sortTime, sequence: _sequence, ...item }) => item);
 }
 
 function buildNamespaceProfiles(
@@ -222,40 +296,26 @@ function buildNamespaceProfiles(
   const profiles = [...namespaces].map((namespace) => {
     const namespaceViolations = violations
       .filter((item) => item.namespace === namespace)
-      .sort((a, b) => toTimestamp(b.detectedAt) - toTimestamp(a.detectedAt));
+      .sort((a, b) => getTimeMs(b.detectedAtMs, b.detectedAt) - getTimeMs(a.detectedAtMs, a.detectedAt));
     const namespaceCommitment = commitments.find((item) => item.namespace === namespace);
     const namespaceBans = bans
       .filter((item) => item.namespace === namespace)
-      .sort((a, b) => toTimestamp(b.banStartTime) - toTimestamp(a.banStartTime));
-    const namespaceUnbans = unbans
-      .filter((item) => item.namespace === namespace)
-      .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
+      .sort((a, b) => getTimeMs(b.banStartTimeMs, b.banStartTime) - getTimeMs(a.banStartTimeMs, a.banStartTime));
+    const namespaceUnbans = unbans.filter((item) => item.namespace === namespace);
+    const disposalActions = buildDisposalActions(namespaceBans, namespaceUnbans);
+    const latestDisposalAction = disposalActions[0];
 
-    const timeline: Array<TimelineRecord & { sortTime: number }> = [
+    const timeline: Array<TimelineRecord & { sortTime: number; sequence: number }> = [
       ...namespaceViolations.map((item) => ({
         id: `timeline-${item.id}`,
         title: item.type === "complik" ? "出现内容违规" : "出现进程违规",
         description: summarizeMarkdown(item.description, 72) || "暂无描述",
         time: item.detectedAt,
         tone: getViolationTone(item.type),
-        sortTime: toTimestamp(item.detectedAt),
+        sortTime: getTimeMs(item.detectedAtMs, item.detectedAt),
+        sequence: item.apiId,
       })),
-      ...namespaceBans.map((item) => ({
-        id: `timeline-ban-${item.id}`,
-        title: "新增封禁记录",
-        description: describeBanRecord(item),
-        time: item.createdAt,
-        tone: "warn" as const,
-        sortTime: toTimestamp(item.createdAt),
-      })),
-      ...namespaceUnbans.map((item) => ({
-        id: `timeline-unban-${item.id}`,
-        title: "新增解封记录",
-        description: `操作人 ${item.operatorName}`,
-        time: item.createdAt,
-        tone: "success" as const,
-        sortTime: toTimestamp(item.createdAt),
-      })),
+      ...disposalActions,
       ...(namespaceCommitment
         ? [
             {
@@ -264,18 +324,19 @@ function buildNamespaceProfiles(
               description: `${namespaceCommitment.fileName}`,
               time: namespaceCommitment.updatedAt,
               tone: "info" as const,
-              sortTime: toTimestamp(namespaceCommitment.updatedAt),
+              sortTime: getTimeMs(namespaceCommitment.updatedAtMs, namespaceCommitment.updatedAt),
+              sequence: getTimeMs(namespaceCommitment.updatedAtMs, namespaceCommitment.updatedAt),
             },
           ]
         : []),
-    ].sort((a, b) => b.sortTime - a.sortTime);
+    ].sort(compareNewestFirst);
 
-    const lastActionAt = timeline[0]?.time ?? "-";
+    const lastActionAt = latestDisposalAction?.time ?? timeline[0]?.time ?? "-";
 
     return {
       namespace,
       violated: namespaceViolations.length > 0,
-      banned: namespaceBans.some((item) => item.active),
+      banned: Boolean(latestDisposalAction?.kind === "ban" && latestDisposalAction.active),
       commitmentUploaded: Boolean(namespaceCommitment),
       lastActionAt,
       commitment: namespaceCommitment
@@ -286,7 +347,7 @@ function buildNamespaceProfiles(
           }
         : undefined,
       recentViolations: namespaceViolations.slice(0, 5),
-      timeline: timeline.map(({ sortTime: _sortTime, ...item }) => item),
+      timeline: timeline.map(({ sortTime: _sortTime, sequence: _sequence, ...item }) => item),
     };
   });
 

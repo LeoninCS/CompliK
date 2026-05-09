@@ -50,10 +50,13 @@ export type ViolationRecord = {
   labelActionResult?: string;
   message?: string;
   detectedAt: string;
+  detectedAtMs: number;
   description: string;
   rawPayload?: string;
   createdAt?: string;
+  createdAtMs?: number;
   updatedAt?: string;
+  updatedAtMs?: number;
 };
 
 export type TimelineRecord = {
@@ -95,7 +98,9 @@ export type CommitmentRecord = {
   fileName: string;
   fileUrl: string;
   createdAt: string;
+  createdAtMs: number;
   updatedAt: string;
+  updatedAtMs: number;
 };
 
 export type BanRecord = {
@@ -106,8 +111,10 @@ export type BanRecord = {
   screenshotUrls: string[];
   operatorName: string;
   banStartTime: string;
+  banStartTimeMs: number;
   banEndTime?: string;
   createdAt: string;
+  createdAtMs: number;
   updatedAt: string;
   active: boolean;
 };
@@ -118,6 +125,7 @@ export type UnbanRecord = {
   namespace: string;
   operatorName: string;
   createdAt: string;
+  createdAtMs: number;
   updatedAt: string;
 };
 

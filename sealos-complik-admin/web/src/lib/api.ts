@@ -183,7 +183,9 @@ function toCommitmentRecord(item: CommitmentDto): CommitmentRecord {
     fileName: item.file_name,
     fileUrl: item.file_url,
     createdAt: formatDateTime(item.created_at),
+    createdAtMs: new Date(item.created_at).getTime(),
     updatedAt: formatDateTime(item.updated_at),
+    updatedAtMs: new Date(item.updated_at).getTime(),
   };
 }
 
@@ -200,8 +202,10 @@ function toBanRecord(item: BanDto): BanRecord {
     screenshotUrls: item.screenshot_urls ?? [],
     operatorName: item.operator_name,
     banStartTime: formatDateTime(item.ban_start_time),
+    banStartTimeMs: startAt,
     banEndTime: item.ban_end_time ? formatDateTime(item.ban_end_time) : undefined,
     createdAt: formatDateTime(item.created_at),
+    createdAtMs: new Date(item.created_at).getTime(),
     updatedAt: formatDateTime(item.updated_at),
     active: !Number.isNaN(startAt) && startAt <= now && (endAt === null || endAt >= now),
   };
@@ -214,6 +218,7 @@ function toUnbanRecord(item: UnbanDto): UnbanRecord {
     namespace: item.namespace,
     operatorName: item.operator_name,
     createdAt: formatDateTime(item.created_at),
+    createdAtMs: new Date(item.created_at).getTime(),
     updatedAt: formatDateTime(item.updated_at),
   };
 }
@@ -230,10 +235,13 @@ function toComplikViolationRecord(item: ComplikViolationDto): ViolationRecord {
     url: item.url,
     keywords: item.keywords ?? [],
     detectedAt: formatDateTime(item.detected_at),
+    detectedAtMs: new Date(item.detected_at).getTime(),
     description: item.description ?? "暂无说明",
     rawPayload: item.raw_payload ? stringifyJson(item.raw_payload) : undefined,
     createdAt: item.created_at ? formatDateTime(item.created_at) : undefined,
+    createdAtMs: item.created_at ? new Date(item.created_at).getTime() : undefined,
     updatedAt: item.updated_at ? formatDateTime(item.updated_at) : undefined,
+    updatedAtMs: item.updated_at ? new Date(item.updated_at).getTime() : undefined,
   };
 }
 
@@ -252,10 +260,13 @@ function toProcscanViolationRecord(item: ProcscanViolationDto): ViolationRecord 
     labelActionResult: item.label_action_result,
     message: item.message,
     detectedAt: formatDateTime(item.detected_at),
+    detectedAtMs: new Date(item.detected_at).getTime(),
     description: item.message,
     rawPayload: item.raw_payload ? stringifyJson(item.raw_payload) : undefined,
     createdAt: item.created_at ? formatDateTime(item.created_at) : undefined,
+    createdAtMs: item.created_at ? new Date(item.created_at).getTime() : undefined,
     updatedAt: item.updated_at ? formatDateTime(item.updated_at) : undefined,
+    updatedAtMs: item.updated_at ? new Date(item.updated_at).getTime() : undefined,
   };
 }
 
