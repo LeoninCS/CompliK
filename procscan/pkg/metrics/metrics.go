@@ -27,7 +27,7 @@ var (
 	})
 
 	ScannerUptimeSeconds = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "procscan_scanner_uptime_seconds",
+		Name: "procscan_scanner_uptime_seconds_total",
 		Help: "Total uptime of the scanner in seconds",
 	})
 
@@ -54,12 +54,12 @@ var (
 	})
 
 	ThreatsByType = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "procscan_threats_by_type",
+		Name: "procscan_threats_by_type_total",
 		Help: "Number of threats detected by type",
 	}, []string{"threat_type"})
 
 	ThreatsBySeverity = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "procscan_threats_by_severity",
+		Name: "procscan_threats_by_severity_total",
 		Help: "Number of threats detected by severity level",
 	}, []string{"severity"})
 

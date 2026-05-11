@@ -16,6 +16,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -37,7 +38,7 @@ type EnvLoader struct {
 
 // TypeConverter is the interface for type converters
 type TypeConverter interface {
-	Convert(value string) (interface{}, error)
+	Convert(value string) (any, error)
 }
 
 // NewEnvLoader creates a new environment variable loader
@@ -74,7 +75,8 @@ func (e *EnvLoader) AddConverter(field string, converter TypeConverter) *EnvLoad
 
 // LoadFromEnv loads configuration from environment variables
 func (e *EnvLoader) LoadFromEnv(config *models.Config) error {
-	legacy.L.WithField("prefix", e.prefix).Info("Starting to load configuration from environment variables")
+	legacy.L.WithField("prefix", e.prefix).
+		Info("Starting to load configuration from environment variables")
 
 	// Load scanner configuration
 	if err := e.loadScannerConfig(&config.Scanner); err != nil {
@@ -97,12 +99,13 @@ func (e *EnvLoader) LoadFromEnv(config *models.Config) error {
 	}
 
 	legacy.L.Info("Environment variable configuration loading completed")
+
 	return nil
 }
 
 // loadScannerConfig loads scanner configuration
 func (e *EnvLoader) loadScannerConfig(scanner *models.ScannerConfig) error {
-	configMap := map[string]interface{}{
+	configMap := map[string]any{
 		"scanner.proc_path":     &scanner.ProcPath,
 		"scanner.scan_interval": &scanner.ScanInterval,
 		"scanner.log_level":     &scanner.LogLevel,
@@ -113,7 +116,7 @@ func (e *EnvLoader) loadScannerConfig(scanner *models.ScannerConfig) error {
 
 // loadActionsConfig loads actions configuration
 func (e *EnvLoader) loadActionsConfig(actions *models.ActionsConfig) error {
-	configMap := map[string]interface{}{
+	configMap := map[string]any{
 		"actions.label.enabled": &actions.Label.Enabled,
 		"actions.label.data":    &actions.Label.Data,
 	}
@@ -123,7 +126,7 @@ func (e *EnvLoader) loadActionsConfig(actions *models.ActionsConfig) error {
 
 // loadNotificationsConfig loads notifications configuration
 func (e *EnvLoader) loadNotificationsConfig(notifications *models.NotificationsConfig) error {
-	configMap := map[string]interface{}{
+	configMap := map[string]any{
 		"notifications.lark.webhook": &notifications.Lark.Webhook,
 	}
 
@@ -133,7 +136,7 @@ func (e *EnvLoader) loadNotificationsConfig(notifications *models.NotificationsC
 // loadDetectionRules loads detection rules
 func (e *EnvLoader) loadDetectionRules(rules *models.DetectionRules) error {
 	// Blacklist rules
-	blacklistMap := map[string]interface{}{
+	blacklistMap := map[string]any{
 		"detectionRules.blacklist.processes":  &rules.Blacklist.Processes,
 		"detectionRules.blacklist.keywords":   &rules.Blacklist.Keywords,
 		"detectionRules.blacklist.commands":   &rules.Blacklist.Commands,
@@ -146,7 +149,7 @@ func (e *EnvLoader) loadDetectionRules(rules *models.DetectionRules) error {
 	}
 
 	// Whitelist rules
-	whitelistMap := map[string]interface{}{
+	whitelistMap := map[string]any{
 		"detectionRules.whitelist.processes":  &rules.Whitelist.Processes,
 		"detectionRules.whitelist.keywords":   &rules.Whitelist.Keywords,
 		"detectionRules.whitelist.commands":   &rules.Whitelist.Commands,
@@ -158,7 +161,7 @@ func (e *EnvLoader) loadDetectionRules(rules *models.DetectionRules) error {
 }
 
 // loadConfigMap loads a configuration map
-func (e *EnvLoader) loadConfigMap(configMap map[string]interface{}) error {
+func (e *EnvLoader) loadConfigMap(configMap map[string]any) error {
 	for field, target := range configMap {
 		envValue := e.getEnvValue(field)
 		if envValue == "" {
@@ -168,11 +171,12 @@ func (e *EnvLoader) loadConfigMap(configMap map[string]interface{}) error {
 		// Type conversion
 		convertedValue, err := e.convertValue(field, envValue)
 		if err != nil {
-			legacy.L.WithFields(map[string]interface{}{
+			legacy.L.WithFields(map[string]any{
 				"field": field,
 				"value": envValue,
 				"error": err.Error(),
 			}).Error("Environment variable type conversion failed")
+
 			return fmt.Errorf("field '%s' type conversion failed: %w", field, err)
 		}
 
@@ -181,7 +185,7 @@ func (e *EnvLoader) loadConfigMap(configMap map[string]interface{}) error {
 			return fmt.Errorf("failed to set field '%s' value: %w", field, err)
 		}
 
-		legacy.L.WithFields(map[string]interface{}{
+		legacy.L.WithFields(map[string]any{
 			"field":   field,
 			"env_key": e.getEnvKey(field),
 			"value":   convertedValue,
@@ -208,11 +212,12 @@ func (e *EnvLoader) getEnvKey(field string) string {
 	key := strings.ReplaceAll(field, ".", e.separator)
 	key = strings.ReplaceAll(key, "-", "_")
 	key = strings.ToUpper(key)
+
 	return e.prefix + e.separator + key
 }
 
 // convertValue converts value type
-func (e *EnvLoader) convertValue(field, value string) (interface{}, error) {
+func (e *EnvLoader) convertValue(field, value string) (any, error) {
 	// Check if there is a custom converter
 	if converter, exists := e.converters[field]; exists {
 		return converter.Convert(value)
@@ -223,13 +228,14 @@ func (e *EnvLoader) convertValue(field, value string) (interface{}, error) {
 }
 
 // autoConvert performs automatic type conversion
-func (e *EnvLoader) autoConvert(field, value string) (interface{}, error) {
+func (e *EnvLoader) autoConvert(field, value string) (any, error) {
 	// Infer type based on field name
 	if strings.Contains(field, "interval") {
 		duration, err := time.ParseDuration(value)
 		if err != nil {
 			return nil, fmt.Errorf("invalid duration format: %w", err)
 		}
+
 		return duration, nil
 	}
 
@@ -239,6 +245,7 @@ func (e *EnvLoader) autoConvert(field, value string) (interface{}, error) {
 		} else if strings.ToLower(value) == "false" || value == "0" {
 			return false, nil
 		}
+
 		return nil, fmt.Errorf("invalid boolean value: %s", value)
 	}
 
@@ -270,13 +277,14 @@ func (e *EnvLoader) parseMap(value string) (map[string]string, error) {
 	}
 
 	result := make(map[string]string)
-	pairs := strings.Split(value, ",")
+	pairs := strings.SplitSeq(value, ",")
 
-	for _, pair := range pairs {
+	for pair := range pairs {
 		kv := strings.SplitN(pair, "=", 2)
 		if len(kv) != 2 {
 			return nil, fmt.Errorf("invalid map format: %s", pair)
 		}
+
 		result[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
 	}
 
@@ -284,15 +292,15 @@ func (e *EnvLoader) parseMap(value string) (map[string]string, error) {
 }
 
 // setFieldValue sets the field value
-func (e *EnvLoader) setFieldValue(target interface{}, value interface{}) error {
+func (e *EnvLoader) setFieldValue(target, value any) error {
 	targetValue := reflect.ValueOf(target)
 	if targetValue.Kind() != reflect.Ptr {
-		return fmt.Errorf("target must be a pointer")
+		return errors.New("target must be a pointer")
 	}
 
 	targetValue = targetValue.Elem()
 	if !targetValue.CanSet() {
-		return fmt.Errorf("cannot set field value")
+		return errors.New("cannot set field value")
 	}
 
 	valueType := reflect.ValueOf(value)
@@ -301,6 +309,7 @@ func (e *EnvLoader) setFieldValue(target interface{}, value interface{}) error {
 	}
 
 	targetValue.Set(valueType.Convert(targetValue.Type()))
+
 	return nil
 }
 
@@ -319,8 +328,8 @@ func (e *EnvLoader) ListEnvVars() []string {
 }
 
 // GetEnvSummary gets the environment variable summary
-func (e *EnvLoader) GetEnvSummary() map[string]interface{} {
-	summary := make(map[string]interface{})
+func (e *EnvLoader) GetEnvSummary() map[string]any {
+	summary := make(map[string]any)
 
 	envVars := e.ListEnvVars()
 	summary["total_env_vars"] = len(envVars)
@@ -336,14 +345,14 @@ func (e *EnvLoader) GetEnvSummary() map[string]interface{} {
 // StringConverter converts string values
 type StringConverter struct{}
 
-func (c *StringConverter) Convert(value string) (interface{}, error) {
+func (c *StringConverter) Convert(value string) (any, error) {
 	return value, nil
 }
 
 // BoolConverter converts boolean values
 type BoolConverter struct{}
 
-func (c *BoolConverter) Convert(value string) (interface{}, error) {
+func (c *BoolConverter) Convert(value string) (any, error) {
 	switch strings.ToLower(value) {
 	case "true", "1", "yes", "on", "enabled":
 		return true, nil
@@ -357,14 +366,14 @@ func (c *BoolConverter) Convert(value string) (interface{}, error) {
 // DurationConverter converts duration values
 type DurationConverter struct{}
 
-func (c *DurationConverter) Convert(value string) (interface{}, error) {
+func (c *DurationConverter) Convert(value string) (any, error) {
 	return time.ParseDuration(value)
 }
 
 // IntConverter converts integer values
 type IntConverter struct{}
 
-func (c *IntConverter) Convert(value string) (interface{}, error) {
+func (c *IntConverter) Convert(value string) (any, error) {
 	return strconv.Atoi(value)
 }
 
@@ -373,7 +382,7 @@ type StringSliceConverter struct {
 	Separator string
 }
 
-func (c *StringSliceConverter) Convert(value string) (interface{}, error) {
+func (c *StringSliceConverter) Convert(value string) (any, error) {
 	separator := c.Separator
 	if separator == "" {
 		separator = ","

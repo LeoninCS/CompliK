@@ -59,6 +59,7 @@ func (r *ContentReviewer) ReviewSiteContent(
 	content *models.CollectorInfo,
 	name string,
 	customRules []CustomKeywordRule,
+	safetyPrompt string,
 ) (*models.DetectorInfo, error) {
 	if content == nil {
 		r.log.Error("Review called with nil content")
@@ -68,17 +69,10 @@ func (r *ContentReviewer) ReviewSiteContent(
 	r.log.Debug("Preparing review request", logger.Fields{
 		"host":             content.Host,
 		"has_custom_rules": len(customRules) > 0,
+		"has_safety_rules": strings.TrimSpace(safetyPrompt) != "",
 	})
 
-	requestData, err := r.prepareRequestData(content, customRules)
-	if err != nil {
-		r.log.Error("Failed to prepare request data", logger.Fields{
-			"error": err.Error(),
-			"host":  content.Host,
-		})
-
-		return nil, fmt.Errorf("failed to prepare request data: %w", err)
-	}
+	requestData := r.prepareRequestData(content, customRules, safetyPrompt)
 
 	r.log.Debug("Calling review API", logger.Fields{
 		"api_url": r.apiURL,
@@ -119,7 +113,8 @@ func (r *ContentReviewer) ReviewSiteContent(
 func (r *ContentReviewer) prepareRequestData(
 	content *models.CollectorInfo,
 	customRules []CustomKeywordRule,
-) (map[string]any, error) {
+	safetyPrompt string,
+) map[string]any {
 	base64Image := base64.StdEncoding.EncodeToString(content.Screenshot)
 	htmlContent := content.HTML
 
@@ -134,10 +129,13 @@ func (r *ContentReviewer) prepareRequestData(
 	}
 
 	var prompt string
-	if customRules == nil || len(customRules) == 0 {
-		prompt = r.buildPrompt(htmlContent)
-	} else {
+	switch {
+	case len(customRules) > 0:
 		prompt = r.buildCustomPrompt(htmlContent, customRules)
+	case strings.TrimSpace(safetyPrompt) != "":
+		prompt = r.buildSafetyPromptFromRules(htmlContent, safetyPrompt)
+	default:
+		prompt = r.buildPrompt(htmlContent)
 	}
 
 	requestData := map[string]any{
@@ -163,7 +161,44 @@ func (r *ContentReviewer) prepareRequestData(
 		"response_format":       ReviewResultSchema,
 	}
 
-	return requestData, nil
+	return requestData
+}
+
+func (r *ContentReviewer) buildSafetyPromptFromRules(
+	htmlContent string,
+	safetyPrompt string,
+) string {
+	htmlBlock := "```html\n" + htmlContent + "\n```"
+
+	return fmt.Sprintf(`# Role: Content Analysis and Compliance Checker
+
+# Goal:
+1. Provide a brief one-sentence description of the webpage content or purpose.
+2. Extract up to 5 keywords relevant to the webpage.
+3. Determine whether the webpage contains illegal or non-compliant content according to the safety rules below.
+
+# Safety Rules:
+%s
+
+# Important Notes:
+I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code.
+If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+The output card description and compliance explanation must be written in Chinese.
+
+# HTML Code Excerpt:
+%s
+
+# Output:
+Please output strictly in the following JSON format without any additional explanation or text:
+
+{
+  "description": "<Generated webpage description in Chinese>",
+  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "compliance": {
+    "is_illegal": "<Yes/No>",
+    "explanation": "<Brief explanation in Chinese listing specific violated categories and evidence>"
+  }
+}`, strings.TrimSpace(safetyPrompt), htmlBlock)
 }
 
 func (r *ContentReviewer) buildPrompt(htmlContent string) string {
@@ -196,6 +231,7 @@ Pay special attention to social platforms like Weibo, WeChat, Douyin, Kuaishou, 
 
 ## Special Reminder
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+The output card description and compliance explanation must be written in Chinese.
 
 # HTML Code Excerpt:
 ` + "```html\n" + htmlContent + "\n```" + `
@@ -204,11 +240,11 @@ If the page shows 404 errors, various errors, blank pages, or missing resources,
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<Generated webpage description>",
+  "description": "<Generated webpage description in Chinese>",
   "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<Brief explanation listing specific violated categories and evidence>"
+    "explanation": "<Brief explanation in Chinese listing specific violated categories and evidence>"
   }
 }`
 }
@@ -216,24 +252,45 @@ Please output strictly in the following JSON format without any additional expla
 func (r *ContentReviewer) buildRulesDescription(rules []CustomKeywordRule) string {
 	var builder strings.Builder
 	for _, rule := range rules {
-		keywords := strings.Split(rule.Keywords, ".")
-		for j, keyword := range keywords {
+		keywords := strings.FieldsFunc(rule.Keywords, func(r rune) bool {
+			switch r {
+			case '.', ',', '，', '、', ';', '；', '\n', '\r':
+				return true
+			default:
+				return false
+			}
+		})
+
+		cleanedKeywords := make([]string, 0, len(keywords))
+		for _, keyword := range keywords {
 			trimmed := strings.TrimSpace(keyword)
-			keywords[j] = trimmed
+			if trimmed != "" {
+				cleanedKeywords = append(cleanedKeywords, trimmed)
+			}
 		}
 
-		ruleText := fmt.Sprintf(`
-### %s
-- Description: %s
-- Keywords: %s
-`, rule.Type, rule.Description, strings.Join(keywords, ", "))
+		ruleType := strings.TrimSpace(rule.Type)
+		if ruleType == "" {
+			ruleType = "custom"
+		}
+
+		description := strings.TrimSpace(rule.Description)
+		if description == "" {
+			description = ruleType + "关键词检测规则"
+		}
+
+		ruleText := fmt.Sprintf(
+			"类型: %s\n说明: %s\n关键词: %s\n",
+			ruleType,
+			description,
+			strings.Join(cleanedKeywords, ", "),
+		)
 
 		builder.WriteString(ruleText)
+		builder.WriteString("\n")
 	}
 
-	result := builder.String()
-
-	return result
+	return strings.TrimSpace(builder.String())
 }
 
 func (r *ContentReviewer) buildCustomPrompt(
@@ -274,20 +331,25 @@ Please strictly detect according to the following custom rules:
 # Important Notes:
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code. Stay vigilant; even seemingly normal websites may hide non-compliant content in the code.
 If the page shows access errors, is blank, or resources do not exist, it should be considered compliant.
+The output card description and compliance explanation must be written in Chinese.
 
 # Output Requirements:
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "is_compliant": true,
-  "keywords": "keyword1,keyword2,keyword3",
-  "description": "One-sentence description of webpage content"
+  "description": "<Generated webpage description in Chinese>",
+  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "compliance": {
+    "is_illegal": "<Yes/No>",
+    "explanation": "<Brief explanation in Chinese listing matched custom rule types, keywords, and evidence>"
+  }
 }
 
 Notes:
-- is_compliant: true indicates compliant content, false indicates non-compliant content found
-- keywords: Multiple keywords separated by commas
-- description: Concise one-sentence description`, rulesDescription, htmlContent)
+- compliance.is_illegal: Yes indicates non-compliant content found, No indicates compliant content
+- keywords: Up to 5 keywords as a JSON array
+- description: Concise one-sentence Chinese description
+- compliance.explanation: Chinese explanation of matched custom rule types, keywords, and evidence`, rulesDescription, htmlContent)
 }
 
 func (r *ContentReviewer) callAPI(

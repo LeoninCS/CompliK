@@ -33,6 +33,6 @@ const (
 )
 
 const (
-	HandleDatabasePostgres = "Postgres"
-	HandleLark             = "Lark"
+	HandleAdminReporter = "AdminReporter"
+	HandleLark          = "Lark"
 )

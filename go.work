@@ -4,4 +4,5 @@ use (
 	.
 	./complik
 	./procscan
+	./sealos-complik-admin
 )

@@ -19,33 +19,9 @@ data:
           {{- toYaml .Values.config.actions.label.data | nindent 10 }}
 
     notifications:
-      lark:
-        webhook: {{ .Values.config.notifications.lark.webhook | quote }}
-
-    detectionRules:
-      blacklist:
-        processes:
-          {{- range .Values.config.detectionRules.blacklist.processes }}
-          - {{ . | quote }}
-          {{- end }}
-        keywords:
-          {{- range .Values.config.detectionRules.blacklist.keywords }}
-          - {{ . | quote }}
-          {{- end }}
-      whitelist:
-        processes:
-          {{- range .Values.config.detectionRules.whitelist.processes }}
-          - {{ . | quote }}
-          {{- end }}
-        commands:
-          {{- range .Values.config.detectionRules.whitelist.commands }}
-          - {{ . | quote }}
-          {{- end }}
-        namespaces:
-          {{- range .Values.config.detectionRules.whitelist.namespaces }}
-          - {{ . | quote }}
-          {{- end }}
-        podNames:
-          {{- range .Values.config.detectionRules.whitelist.podNames }}
-          - {{ . | quote }}
-          {{- end }}
+      admin:
+        base_url: {{ .Values.config.notifications.admin.base_url | quote }}
+        timeout: {{ .Values.config.notifications.admin.timeout | quote }}
+        basic_auth:
+          username: {{ .Values.config.notifications.admin.basic_auth.username | quote }}
+          password: {{ .Values.config.notifications.admin.basic_auth.password | quote }}

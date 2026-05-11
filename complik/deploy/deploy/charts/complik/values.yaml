@@ -20,6 +20,11 @@ resources:
 
 containerPort: 8428
 
+browserRuntime:
+  home: /tmp
+  cacheHome: /tmp/.cache
+  bin: /usr/bin/chromium
+
 database:
   create: true
 
@@ -29,20 +34,15 @@ rbac:
 
 external:
   region: "hzh"
-  ai:
-    apiKey: ""
-    apiBase: "https://aiproxy.usw.sealos.io/v1"
-    apiPath: "/chat/completions"
-    model: "gpt-5"
 
-  database:
-    host: ""
-    port: "3306"
-    username: "root"
-    password: ""
-
-  lark:
-    webhook: ""
+  admin:
+    baseURL: "http://sealos-complik-admin:8080"
+    timeoutSecond: 10
+    basicAuth:
+      enabled: false
+      secretName: sealos-complik-admin-auth
+      usernameKey: username
+      passwordKey: password
 
 plugins:
   complete:
@@ -77,15 +77,13 @@ plugins:
 
   safety:
     enabled: true
+    maxWorkers: 20
 
   custom:
     enabled: false
-    databaseName: "custom"
-    tickerMinute: 800
     maxWorkers: 20
-    tableName: "CustomKeywordRule"
 
-  postgres:
+  adminReporter:
     enabled: true
 
   lark:

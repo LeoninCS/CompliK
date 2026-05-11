@@ -63,7 +63,7 @@ func (l *Logger) Fatal(msg string) {
 }
 
 // WithField adds a single field to the log entry
-func (l *Logger) WithField(key string, value interface{}) *Logger {
+func (l *Logger) WithField(key string, value any) *Logger {
 	return &Logger{
 		logger: l.logger,
 		entry:  l.entry.WithField(key, value),
@@ -71,7 +71,7 @@ func (l *Logger) WithField(key string, value interface{}) *Logger {
 }
 
 // WithFields adds multiple fields to the log entry
-func (l *Logger) WithFields(fields map[string]interface{}) *Logger {
+func (l *Logger) WithFields(fields map[string]any) *Logger {
 	return &Logger{
 		logger: l.logger,
 		entry:  l.entry.WithFields(fields),
@@ -92,6 +92,7 @@ func (l *Logger) SetLevel(level string) {
 	if err != nil {
 		logLevel = logrus.InfoLevel
 	}
+
 	l.logger.SetLevel(logLevel)
 }
 

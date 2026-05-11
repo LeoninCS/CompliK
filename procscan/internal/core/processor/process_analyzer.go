@@ -15,6 +15,7 @@
 package processor
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -34,15 +35,16 @@ type ProcessStatus struct {
 // ReadProcessStatus reads and parses /proc/{pid}/status file
 func ReadProcessStatus(procPath string, pid int) (*ProcessStatus, error) {
 	statusFile := fmt.Sprintf("%s/%d/status", procPath, pid)
+
 	data, err := os.ReadFile(statusFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status file: %w", err)
 	}
 
 	status := &ProcessStatus{PID: pid}
-	lines := strings.Split(string(data), "\n")
+	lines := strings.SplitSeq(string(data), "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
 			continue
@@ -73,6 +75,7 @@ func ReadProcessStatus(procPath string, pid int) (*ProcessStatus, error) {
 					nspids = append(nspids, nspid)
 				}
 			}
+
 			status.NSpid = nspids
 		}
 	}
@@ -88,6 +91,7 @@ func IsContainerMainProcess(status *ProcessStatus) bool {
 	}
 	// The last NSpid value represents the PID within the innermost namespace (container)
 	containerPID := status.NSpid[len(status.NSpid)-1]
+
 	return containerPID == 1
 }
 
@@ -102,6 +106,7 @@ func FindContainerMainProcess(procPath string, pid int) (int, error) {
 			// Circular reference detected (shouldn't happen in normal cases)
 			return 0, fmt.Errorf("circular process parent reference detected at PID %d", currentPID)
 		}
+
 		visited[currentPID] = true
 
 		status, err := ReadProcessStatus(procPath, currentPID)
@@ -118,7 +123,7 @@ func FindContainerMainProcess(procPath string, pid int) (int, error) {
 		// Move to parent process
 		if status.PPID == 0 || status.PPID == currentPID {
 			// Reached init process or circular reference
-			return 0, fmt.Errorf("reached init process without finding container main process")
+			return 0, errors.New("reached init process without finding container main process")
 		}
 
 		currentPID = status.PPID
@@ -128,6 +133,7 @@ func FindContainerMainProcess(procPath string, pid int) (int, error) {
 // GetProcessNamespaceInfo extracts namespace information for better process identification
 func GetProcessNamespaceInfo(procPath string, pid int) (map[string]string, error) {
 	nsPath := fmt.Sprintf("%s/%d/ns", procPath, pid)
+
 	entries, err := os.ReadDir(nsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read namespace directory: %w", err)
@@ -136,10 +142,12 @@ func GetProcessNamespaceInfo(procPath string, pid int) (map[string]string, error
 	nsInfo := make(map[string]string)
 	for _, entry := range entries {
 		linkPath := fmt.Sprintf("%s/%s", nsPath, entry.Name())
+
 		target, err := os.Readlink(linkPath)
 		if err != nil {
 			continue
 		}
+
 		nsInfo[entry.Name()] = target
 	}
 

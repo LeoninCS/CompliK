@@ -17,8 +17,9 @@
 package log
 
 import (
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 // L is a global, standardized logrus logger instance.
@@ -37,9 +38,11 @@ func init() {
 func SetLevel(levelStr string) {
 	level, err := logrus.ParseLevel(levelStr)
 	if err != nil {
-		L.WithField("error", err).Warnf("Invalid log level '%s', will continue using current level", levelStr)
+		L.WithField("error", err).
+			Warnf("Invalid log level '%s', will continue using current level", levelStr)
 		return
 	}
+
 	L.SetLevel(level)
 	L.WithField("new_level", level.String()).Info("Log level updated")
 }

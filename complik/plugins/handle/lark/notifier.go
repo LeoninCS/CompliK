@@ -14,40 +14,38 @@
 
 // Package lark implements notification functionality for Lark (Feishu) messaging.
 // This file contains the notifier implementation that sends formatted messages
-// to Lark webhooks with support for whitelist filtering and rich card formatting.
+// to Lark webhooks with rich card formatting.
+//
+//nolint:wsl_v5 // Card construction keeps related branches compact.
 package lark
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/bearslyricattack/CompliK/complik/pkg/models"
-	"github.com/bearslyricattack/CompliK/complik/plugins/handle/lark/whitelist"
-	"gorm.io/gorm"
 )
 
 type Notifier struct {
-	WebhookURL       string
-	HTTPClient       *http.Client
-	WhitelistService *whitelist.WhitelistService
-	Region           string
+	WebhookURL string
+	HTTPClient *http.Client
+	Region     string
 }
 
-func NewNotifier(webhookURL string, db *gorm.DB, timeout time.Duration, region string) *Notifier {
+func NewNotifier(webhookURL, region string) *Notifier {
 	return &Notifier{
 		WebhookURL: webhookURL,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		WhitelistService: whitelist.NewWhitelistService(db, timeout),
-		Region:           region,
+		Region: region,
 	}
 }
 
@@ -66,298 +64,12 @@ func (f *Notifier) SendAnalysisNotification(results *models.DetectorInfo) error 
 		return nil
 	}
 
-	isWhitelisted := false
-
-	var whitelistInfo *whitelist.Whitelist
-	if f.WhitelistService != nil {
-		whitelisted, whitelist, err := f.WhitelistService.IsWhitelisted(
-			results.Namespace,
-			results.Host,
-			f.Region,
-		)
-		if err != nil {
-			log.Printf("Whitelist check failed: %v", err)
-		} else {
-			isWhitelisted = whitelisted
-			whitelistInfo = whitelist
-		}
-	}
-
-	var cardContent map[string]any
-	if isWhitelisted {
-		cardContent = f.buildWhitelistMessage(results, whitelistInfo)
-		log.Printf(
-			"Resource [Namespace: %s, Host: %s] is in whitelist, sending whitelist notification",
-			results.Namespace,
-			results.Host,
-		)
-	} else {
-		cardContent = f.buildAlertMessage(results)
-	}
-
 	message := LarkMessage{
 		MsgType: "interactive",
-		Card:    cardContent,
+		Card:    f.buildAlertMessage(results),
 	}
 
 	return f.sendMessage(message)
-}
-
-func (f *Notifier) buildWhitelistMessage(
-	results *models.DetectorInfo,
-	whitelistInfo *whitelist.Whitelist,
-) map[string]any {
-	basicInfoElements := []map[string]any{
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Resource Information**",
-				"tag":     "lark_md",
-			},
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Region:** " + results.Region,
-				"tag":     "lark_md",
-			},
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Resource Name:** " + results.Name,
-				"tag":     "lark_md",
-			},
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Namespace:** " + results.Namespace,
-				"tag":     "lark_md",
-			},
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Host Address:** " + results.Host,
-				"tag":     "lark_md",
-			},
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Full URL:** " + results.URL,
-				"tag":     "lark_md",
-			},
-		},
-	}
-
-	if len(results.Path) > 0 {
-		var pathContent strings.Builder
-		pathContent.WriteString("**Detection Paths:**\n")
-		for i, path := range results.Path {
-			if i < 5 {
-				pathContent.WriteString(fmt.Sprintf("  • %s\n", path))
-			} else if i == 5 {
-				pathContent.WriteString(fmt.Sprintf("  • ... %d more paths\n", len(results.Path)-5))
-				break
-			}
-		}
-
-		basicInfoElements = append(basicInfoElements, map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"content": pathContent.String(),
-				"tag":     "lark_md",
-			},
-		})
-	}
-
-	// Whitelist information
-	whitelistElements := []map[string]any{
-		{
-			"tag": "hr",
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Whitelist Information**",
-				"tag":     "lark_md",
-			},
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Whitelist Status:** Added to whitelist",
-				"tag":     "lark_md",
-			},
-		},
-	}
-
-	// Display different information based on whitelist type
-	if whitelistInfo != nil {
-		var (
-			whitelistTypeText string
-			validityText      string
-		)
-
-		switch whitelistInfo.Type {
-		case whitelist.WhitelistTypeNamespace:
-			whitelistTypeText = "Namespace Whitelist"
-			validityText = "Permanent"
-		case whitelist.WhitelistTypeHost:
-			whitelistTypeText = "Host Whitelist"
-			validityText = "Expires"
-		}
-
-		whitelistElements = append(whitelistElements,
-			map[string]any{
-				"tag": "div",
-				"text": map[string]any{
-					"content": "**Whitelist Type:** " + whitelistTypeText,
-					"tag":     "lark_md",
-				},
-			},
-			map[string]any{
-				"tag": "div",
-				"text": map[string]any{
-					"content": "**Validity:** " + validityText,
-					"tag":     "lark_md",
-				},
-			},
-			map[string]any{
-				"tag": "div",
-				"text": map[string]any{
-					"content": "**Created At:** " + whitelistInfo.CreatedAt.Format(time.DateTime),
-					"tag":     "lark_md",
-				},
-			},
-		)
-
-		// Display the specific matching value
-		if whitelistInfo.Type == whitelist.WhitelistTypeNamespace && whitelistInfo.Namespace != "" {
-			whitelistElements = append(whitelistElements, map[string]any{
-				"tag": "div",
-				"text": map[string]any{
-					"content": fmt.Sprintf(
-						"**Match Rule:** Namespace `%s`",
-						whitelistInfo.Namespace,
-					),
-					"tag": "lark_md",
-				},
-			})
-		} else if whitelistInfo.Type == whitelist.WhitelistTypeHost && whitelistInfo.Hostname != "" {
-			whitelistElements = append(whitelistElements, map[string]any{
-				"tag": "div",
-				"text": map[string]any{
-					"content": fmt.Sprintf("**Match Rule:** Host `%s`", whitelistInfo.Hostname),
-					"tag":     "lark_md",
-				},
-			})
-		}
-
-		// Display remark if present
-		if whitelistInfo.Remark != "" {
-			whitelistElements = append(whitelistElements, map[string]any{
-				"tag": "div",
-				"text": map[string]any{
-					"content": "**Remark:** " + whitelistInfo.Remark,
-					"tag":     "lark_md",
-				},
-			})
-		}
-	}
-
-	detectionElements := []map[string]any{
-		{
-			"tag": "hr",
-		},
-		{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Detected Content**",
-				"tag":     "lark_md",
-			},
-		},
-	}
-
-	if results.Description != "" {
-		detectionElements = append(detectionElements, map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Description:** " + results.Description,
-				"tag":     "lark_md",
-			},
-		})
-	}
-
-	if len(results.Keywords) > 0 {
-		var keywordContent strings.Builder
-		keywordContent.WriteString("**Keywords:** ")
-		for i, keyword := range results.Keywords {
-			if i > 0 {
-				keywordContent.WriteString(", ")
-			}
-
-			keywordContent.WriteString(fmt.Sprintf("`%s`", keyword))
-		}
-
-		detectionElements = append(detectionElements, map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"content": keywordContent.String(),
-				"tag":     "lark_md",
-			},
-		})
-	}
-
-	if results.Explanation != "" {
-		detectionElements = append(detectionElements, map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Detection Evidence:** " + results.Explanation,
-				"tag":     "lark_md",
-			},
-		})
-	}
-
-	elements := append(basicInfoElements, whitelistElements...)
-
-	elements = append(elements, detectionElements...)
-
-	elements = append(elements,
-		map[string]any{
-			"tag": "hr",
-		},
-		map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**Detection Time:** " + time.Now().Format(time.DateTime),
-				"tag":     "lark_md",
-			},
-		},
-		map[string]any{
-			"tag": "div",
-			"text": map[string]any{
-				"content": "**This resource is in the whitelist, detection result has been ignored**",
-				"tag":     "lark_md",
-			},
-		},
-	)
-
-	return map[string]any{
-		"config": map[string]any{
-			"wide_screen_mode": true,
-		},
-		"header": map[string]any{
-			"template": "green",
-			"title": map[string]any{
-				"content": "Whitelisted Resource Detection Notice",
-				"tag":     "plain_text",
-			},
-		},
-		"elements": elements,
-	}
 }
 
 func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]any {
@@ -365,35 +77,35 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Region:** " + results.Region,
+				"content": "**地域:** " + results.Region,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Resource Name:** " + results.Name,
+				"content": "**资源名称:** " + results.Name,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Namespace:** " + results.Namespace,
+				"content": "**命名空间:** " + results.Namespace,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Host Address:** " + results.Host,
+				"content": "**主机地址:** " + results.Host,
 				"tag":     "lark_md",
 			},
 		},
 		{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Full URL:** " + results.URL,
+				"content": "**完整 URL:** " + results.URL,
 				"tag":     "lark_md",
 			},
 		},
@@ -401,12 +113,12 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 
 	if len(results.Path) > 0 {
 		var pathContent strings.Builder
-		pathContent.WriteString("**Detection Paths:**\n")
+		pathContent.WriteString("**检测路径:**\n")
 		for i, path := range results.Path {
 			if i < 5 {
-				pathContent.WriteString(fmt.Sprintf("  • %s\n", path))
+				fmt.Fprintf(&pathContent, "  • %s\n", path)
 			} else if i == 5 {
-				pathContent.WriteString(fmt.Sprintf("  • ... %d more paths\n", len(results.Path)-5))
+				fmt.Fprintf(&pathContent, "  • 另有 %d 条路径\n", len(results.Path)-5)
 				break
 			}
 		}
@@ -423,8 +135,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 	basicInfoElements = append(basicInfoElements, map[string]any{
 		"tag": "hr",
 	})
-	//nolint:gocritic
-	elements := append(basicInfoElements)
+	elements := basicInfoElements
 	if results.IsIllegal {
 		elements = append(elements, map[string]any{
 			"tag": "hr",
@@ -434,7 +145,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 			{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Violation Details**",
+					"content": "**违规详情**",
 					"tag":     "lark_md",
 				},
 			},
@@ -444,7 +155,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 			violationElements = append(violationElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Description:** " + results.Description,
+					"content": "**描述:** " + results.Description,
 					"tag":     "lark_md",
 				},
 			})
@@ -452,13 +163,13 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 
 		if len(results.Keywords) > 0 {
 			var keywordContent strings.Builder
-			keywordContent.WriteString("**Matched Keywords:** ")
+			keywordContent.WriteString("**命中关键词:** ")
 			for i, keyword := range results.Keywords {
 				if i > 0 {
 					keywordContent.WriteString(", ")
 				}
 
-				keywordContent.WriteString(fmt.Sprintf("`%s`", keyword))
+				fmt.Fprintf(&keywordContent, "`%s`", keyword)
 			}
 
 			violationElements = append(violationElements, map[string]any{
@@ -474,7 +185,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 			violationElements = append(violationElements, map[string]any{
 				"tag": "div",
 				"text": map[string]any{
-					"content": "**Violation Evidence:** " + results.Explanation,
+					"content": "**违规依据:** " + results.Explanation,
 					"tag":     "lark_md",
 				},
 			})
@@ -491,7 +202,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Detection Time:** " + time.Now().Format(time.DateTime),
+				"content": "**检测时间:** " + time.Now().Format(time.DateTime),
 				"tag":     "lark_md",
 			},
 		},
@@ -502,7 +213,7 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		elements = append(elements, map[string]any{
 			"tag": "div",
 			"text": map[string]any{
-				"content": "**Please handle the violation content promptly!**",
+				"content": "**请及时处理违规内容！**",
 				"tag":     "lark_md",
 			},
 		})
@@ -510,10 +221,10 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 
 	template := "green"
 
-	title := "Website Content Detection Notice"
+	title := "网站内容检测通知"
 	if results.IsIllegal {
 		template = "red"
-		title = "Website Content Violation Alert"
+		title = "网站内容违规告警"
 	}
 
 	return map[string]any{
@@ -537,15 +248,24 @@ func (f *Notifier) sendMessage(message LarkMessage) error {
 		return fmt.Errorf("failed to serialize message: %w", err)
 	}
 
-	resp, err := f.HTTPClient.Post(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
 		f.WebhookURL,
-		"application/json",
 		bytes.NewBuffer(jsonData),
 	)
 	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := f.HTTPClient.Do(req)
+	if err != nil {
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -559,7 +279,7 @@ func (f *Notifier) sendMessage(message LarkMessage) error {
 
 	if resp.StatusCode != http.StatusOK || larkResp.Code != 0 {
 		return fmt.Errorf(
-			"Lark webhook notification failed: HTTP status %d, Lark error code %d, error message: %s",
+			"lark webhook notification failed: HTTP status %d, Lark error code %d, error message: %s",
 			resp.StatusCode,
 			larkResp.Code,
 			larkResp.Msg,

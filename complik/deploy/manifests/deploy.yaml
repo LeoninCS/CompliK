@@ -65,10 +65,11 @@ data:
         enabled: true
         settings: |
           {
-            "apiKey": "",
-            "apiBase": "",
-            "apiPath": "/chat/completions",
-            "model": "gpt-5"
+            "maxWorkers": 20,
+            "adminBaseURL": "http://sealos-complik-admin:8080",
+            "adminTimeoutSecond": 10,
+            "adminBasicAuthUsername": "${ADMIN_BASIC_AUTH_USERNAME}",
+            "adminBasicAuthPassword": "${ADMIN_BASIC_AUTH_PASSWORD}"
           }
 
       - name: "Custom"
@@ -76,30 +77,23 @@ data:
         enabled: false
         settings: |
           {
-            "databaseName": "custom",
-            "tickerMinute": 800,
             "maxWorkers": 20,
-            "host": "",
-            "port": "",
-            "username": "root",
-            "password": "",
-            "tableName": "",
-            "apiKey": "",
-            "apiBase": "",
-            "apiPath": "/chat/completions",
-            "model": "gpt-5"
+            "adminBaseURL": "http://sealos-complik-admin:8080",
+            "adminTimeoutSecond": 10,
+            "adminBasicAuthUsername": "${ADMIN_BASIC_AUTH_USERNAME}",
+            "adminBasicAuthPassword": "${ADMIN_BASIC_AUTH_PASSWORD}"
           }
 
-      - name: "Postgres"
+      - name: "AdminReporter"
         type: "Handle"
         enabled: true
         settings: |
           {
             "region": "hzh",
-            "host": "",
-            "port": "",
-            "username": "",
-            "password": ""
+            "adminBaseURL": "http://sealos-complik-admin:8080",
+            "adminTimeoutSecond": 10,
+            "adminBasicAuthUsername": "${ADMIN_BASIC_AUTH_USERNAME}",
+            "adminBasicAuthPassword": "${ADMIN_BASIC_AUTH_PASSWORD}"
           }
 
       - name: "Lark"
@@ -108,7 +102,10 @@ data:
         settings: |
           {
             "region": "hzh",
-            "webhook": ""
+            "adminBaseURL": "http://sealos-complik-admin:8080",
+            "adminTimeoutSecond": 10,
+            "adminBasicAuthUsername": "${ADMIN_BASIC_AUTH_USERNAME}",
+            "adminBasicAuthPassword": "${ADMIN_BASIC_AUTH_PASSWORD}"
           }
     logging:
       level: "info"
@@ -168,6 +165,23 @@ spec:
           image: bearslyricattack/sealos-complik-service:latest
           imagePullPolicy: Always
           name: service-complik
+          env:
+            - name: HOME
+              value: /tmp
+            - name: XDG_CACHE_HOME
+              value: /tmp/.cache
+            - name: ROD_BROWSER_BIN
+              value: /usr/bin/chromium
+            - name: ADMIN_BASIC_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sealos-complik-admin-auth
+                  key: username
+            - name: ADMIN_BASIC_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sealos-complik-admin-auth
+                  key: password
           ports:
             - containerPort: 8428
               protocol: TCP

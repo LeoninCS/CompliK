@@ -190,13 +190,16 @@ var _ = Describe("Processor", func() {
 			matched, message := processor.isBlacklisted("minerd", "/usr/bin/minerd -o pool")
 			Expect(matched).To(BeTrue())
 			Expect(message).To(ContainSubstring("minerd"))
-			Expect(message).To(ContainSubstring("blacklist rule"))
+			Expect(message).To(ContainSubstring("命中黑名单规则"))
 		})
 
 		It("should detect blacklisted keyword in command", func() {
-			matched, message := processor.isBlacklisted("worker", "/app/worker stratum+tcp://pool.com:3333")
+			matched, message := processor.isBlacklisted(
+				"worker",
+				"/app/worker stratum+tcp://pool.com:3333",
+			)
 			Expect(matched).To(BeTrue())
-			Expect(message).To(ContainSubstring("keyword blacklist"))
+			Expect(message).To(ContainSubstring("命中关键词黑名单规则"))
 		})
 
 		It("should not match safe process", func() {
@@ -225,7 +228,9 @@ var _ = Describe("Processor", func() {
 		})
 
 		It("should whitelist by process name", func() {
-			Expect(processor.isProcessWhitelisted("python3", "/usr/bin/python3 app.py")).To(BeTrue())
+			Expect(
+				processor.isProcessWhitelisted("python3", "/usr/bin/python3 app.py"),
+			).To(BeTrue())
 		})
 
 		It("should whitelist by command pattern", func() {
@@ -305,7 +310,9 @@ var _ = Describe("Processor", func() {
 		It("should validate valid hex strings", func() {
 			Expect(isHexString("0123456789abcdef")).To(BeTrue())
 			Expect(isHexString("ABCDEF0123456789")).To(BeTrue())
-			Expect(isHexString("aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd")).To(BeTrue())
+			Expect(
+				isHexString("aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd"),
+			).To(BeTrue())
 		})
 
 		It("should reject non-hex strings", func() {
@@ -327,6 +334,7 @@ var _ = Describe("Processor", func() {
 
 		BeforeEach(func() {
 			var err error
+
 			tmpDir, err = os.MkdirTemp("", "proc-test-*")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -344,11 +352,11 @@ var _ = Describe("Processor", func() {
 
 		It("should return list of PIDs from proc directory", func() {
 			// Create mock process directories
-			os.Mkdir(filepath.Join(tmpDir, "1234"), 0755)
-			os.Mkdir(filepath.Join(tmpDir, "5678"), 0755)
-			os.Mkdir(filepath.Join(tmpDir, "9999"), 0755)
+			mustMkdir(filepath.Join(tmpDir, "1234"))
+			mustMkdir(filepath.Join(tmpDir, "5678"))
+			mustMkdir(filepath.Join(tmpDir, "9999"))
 			// Create non-numeric directory (should be ignored)
-			os.Mkdir(filepath.Join(tmpDir, "self"), 0755)
+			mustMkdir(filepath.Join(tmpDir, "self"))
 
 			pids, err := processor.GetAllProcesses()
 			Expect(err).NotTo(HaveOccurred())
@@ -380,6 +388,7 @@ var _ = Describe("Processor", func() {
 
 		BeforeEach(func() {
 			var err error
+
 			tmpDir, err = os.MkdirTemp("", "proc-test-*")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -398,7 +407,7 @@ var _ = Describe("Processor", func() {
 		It("should extract container ID from cgroup with containerd", func() {
 			// Create mock PID directory
 			pidDir := filepath.Join(tmpDir, "1234")
-			os.Mkdir(pidDir, 0755)
+			mustMkdir(pidDir)
 
 			// Create mock cgroup file
 			cgroupContent := `12:memory:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope
@@ -421,7 +430,7 @@ var _ = Describe("Processor", func() {
 		It("should return empty string for non-container process", func() {
 			// Create mock cgroup without container info
 			pidDir := filepath.Join(tmpDir, "5678")
-			os.Mkdir(pidDir, 0755)
+			mustMkdir(pidDir)
 
 			containerID := processor.getContainerIDFromPID(5678)
 			Expect(containerID).To(BeEmpty())

@@ -16,6 +16,7 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -57,7 +58,7 @@ func NewMetricsServer(port int, path string) *Server {
 
 // Start starts the metrics server
 func (s *Server) Start() error {
-	legacy.L.WithFields(map[string]interface{}{
+	legacy.L.WithFields(map[string]any{
 		"port": s.port,
 		"path": s.path,
 	}).Info("Starting Prometheus metrics server")
@@ -66,8 +67,12 @@ func (s *Server) Start() error {
 }
 
 // StartWithRetry starts the metrics server with retry logic
-func (s *Server) StartWithRetry(ctx context.Context, maxRetries int, retryInterval time.Duration) error {
-	for i := 0; i < maxRetries; i++ {
+func (s *Server) StartWithRetry(
+	ctx context.Context,
+	maxRetries int,
+	retryInterval time.Duration,
+) error {
+	for i := range maxRetries {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -79,7 +84,7 @@ func (s *Server) StartWithRetry(ctx context.Context, maxRetries int, retryInterv
 			return nil
 		}
 
-		legacy.L.WithFields(map[string]interface{}{
+		legacy.L.WithFields(map[string]any{
 			"attempt":     i + 1,
 			"max_retries": maxRetries,
 			"error":       err.Error(),
@@ -94,7 +99,10 @@ func (s *Server) StartWithRetry(ctx context.Context, maxRetries int, retryInterv
 		}
 	}
 
-	return fmt.Errorf("failed to start metrics server after reaching maximum retries: %d", maxRetries)
+	return fmt.Errorf(
+		"failed to start metrics server after reaching maximum retries: %d",
+		maxRetries,
+	)
 }
 
 // Stop stops the metrics server
@@ -116,11 +124,21 @@ func (s *Server) GetMetricsURL() string {
 // IsHealthy checks if the metrics server is healthy
 func (s *Server) IsHealthy() bool {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(s.GetMetricsURL())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.GetMetricsURL(), nil)
+	if err != nil {
+		return false
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return false
 	}
 	defer resp.Body.Close()
+
 	return resp.StatusCode == http.StatusOK
 }
 
@@ -137,8 +155,9 @@ func (s *Server) WaitForHealth(ctx context.Context, timeout time.Duration) error
 			return ctx.Err()
 		case <-ticker.C:
 			if time.Now().After(deadline) {
-				return fmt.Errorf("metrics server health check timeout")
+				return errors.New("metrics server health check timeout")
 			}
+
 			if s.IsHealthy() {
 				legacy.L.Info("Metrics server health check passed")
 				return nil
@@ -178,6 +197,7 @@ func NewMetricsServerFromConfig(config models.MetricsConfig) *Server {
 	if config.ReadTimeout > 0 {
 		server.server.ReadTimeout = config.ReadTimeout
 	}
+
 	if config.WriteTimeout > 0 {
 		server.server.WriteTimeout = config.WriteTimeout
 	}
@@ -196,7 +216,11 @@ func RunMetricsServer(config models.MetricsConfig) error {
 
 	// Start the server
 	go func() {
-		if err := server.StartWithRetry(context.Background(), config.MaxRetries, config.RetryInterval); err != nil {
+		if err := server.StartWithRetry(
+			context.Background(),
+			config.MaxRetries,
+			config.RetryInterval,
+		); err != nil {
 			legacy.L.WithError(err).Error("Failed to start metrics server")
 		}
 	}()

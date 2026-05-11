@@ -52,3 +52,10 @@ jobs:
           version: latest
           working-directory: procscan
           args: --color=always
+
+      - name: Run Linter (admin)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: sealos-complik-admin
+          args: --color=always
