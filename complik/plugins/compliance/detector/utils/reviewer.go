@@ -173,9 +173,9 @@ func (r *ContentReviewer) buildSafetyPromptFromRules(
 	return fmt.Sprintf(`# Role: Content Analysis and Compliance Checker
 
 # Goal:
-1. Provide a brief one-sentence description of the webpage content or purpose.
-2. Extract up to 5 keywords relevant to the webpage.
-3. Determine whether the webpage contains illegal or non-compliant content according to the safety rules below.
+1. Provide an accurate one-sentence description of the webpage's visible content, service, product, or purpose.
+2. Extract up to 5 English matched keywords or evidence phrases that triggered the safety rules.
+3. Determine whether the webpage contains illegal or non-compliant content according to the safety rules below, and identify the exact violating content locations and evidence.
 
 # Safety Rules:
 %s
@@ -184,9 +184,9 @@ func (r *ContentReviewer) buildSafetyPromptFromRules(
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code.
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
 Output language requirements:
-- description must be Simplified Chinese.
-- keywords must be English keywords.
-- compliance.explanation must be Simplified Chinese and should state the violated category and concrete evidence.
+- description must be Simplified Chinese and must precisely describe the webpage content, business, product, or function.
+- keywords must be English matched risk keywords or evidence phrases found in the screenshot or HTML. Use an empty array when no rule is matched.
+- compliance.explanation must be Simplified Chinese and should state the violated category, exact matched text, UI location or HTML evidence, and why that evidence violates the rules.
 
 # HTML Code Excerpt:
 %s
@@ -195,11 +195,11 @@ Output language requirements:
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<简体中文网页描述>",
-  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "description": "<简体中文网页内容精准描述>",
+  "keywords": ["<matched_keyword1>", "<matched_keyword2>", "<matched_keyword3>", "<matched_keyword4>", "<matched_keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<简体中文违规依据，说明违规类型、命中内容和具体证据>"
+    "explanation": "<简体中文违规依据，说明违规类型、具体违规位置、命中文案或HTML证据，以及违规原因>"
   }
 }`, strings.TrimSpace(safetyPrompt), htmlBlock)
 }
@@ -208,16 +208,16 @@ func (r *ContentReviewer) buildPrompt(htmlContent string) string {
 	return `# Role: Content Analysis and Compliance Checker
 
 # Goal:
-1. Provide a brief one-sentence description of the given webpage content or purpose.
-2. Extract several keywords relevant to the webpage.
-3. Determine whether the webpage contains content that violates Chinese laws and regulations, particularly in the following categories: pornography, political sensitivity, prohibited items, gambling, cult activities, violence/terrorism, fraud, and infringement.
+1. Provide an accurate one-sentence description of the given webpage's visible content, service, product, or purpose.
+2. Extract up to 5 English matched keywords or evidence phrases that indicate risk.
+3. Determine whether the webpage contains content that violates Chinese laws and regulations, particularly in the following categories: pornography, political sensitivity, prohibited items, gambling, cult activities, violence/terrorism, fraud, and infringement, and identify the exact violating content locations and evidence.
 
 # Instructions:
-1. **Content Description**: Based on the HTML file and webpage screenshot, generate a one-sentence summary describing the main content or purpose of the webpage.
+1. **Content Description**: Based on the HTML file and webpage screenshot, generate a precise one-sentence summary describing the webpage's visible content, business, product, or function. Include the platform name, service type, key functions, and payment or transaction method when they are visible.
 
-2. **Keyword Extraction**: Extract up to 5 keywords most relevant to the webpage content.
+2. **Matched Keyword Extraction**: Extract up to 5 English keywords or short evidence phrases that directly indicate the matched risk. Prefer exact visible text, button text, titles, navigation labels, payment words, action words, HTML text, or other phrases that support the compliance decision.
 
-3. **Compliance Assessment**: Analyze the webpage content to determine if it contains the following illegal or non-compliant content, and provide a brief explanation.
+3. **Compliance Assessment**: Analyze the webpage content to determine if it contains the following illegal or non-compliant content, and provide a concrete explanation with location and evidence.
    - **Pornographic Content**: Are there any sexually explicit images, text, or videos?
    - **Political Sensitivity**: Is there politically sensitive information or criticism of the Chinese government?
    - **Prohibited Items**: Are there any items, behaviors, or services prohibited by Chinese law?
@@ -235,9 +235,9 @@ Pay special attention to social platforms like Weibo, WeChat, Douyin, Kuaishou, 
 ## Special Reminder
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
 Output language requirements:
-- description must be Simplified Chinese.
-- keywords must be English keywords.
-- compliance.explanation must be Simplified Chinese and should state the violated category and concrete evidence.
+- description must be Simplified Chinese and must precisely describe the webpage content, business, product, or function.
+- keywords must be English matched risk keywords or evidence phrases found in the screenshot or HTML. Use an empty array when no risk is matched.
+- compliance.explanation must be Simplified Chinese and should state the violated category, exact matched text, UI location or HTML evidence, and why that evidence violates the rules.
 
 # HTML Code Excerpt:
 ` + "```html\n" + htmlContent + "\n```" + `
@@ -246,11 +246,11 @@ Output language requirements:
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<简体中文网页描述>",
-  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "description": "<简体中文网页内容精准描述>",
+  "keywords": ["<matched_keyword1>", "<matched_keyword2>", "<matched_keyword3>", "<matched_keyword4>", "<matched_keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<简体中文违规依据，说明违规类型、命中内容和具体证据>"
+    "explanation": "<简体中文违规依据，说明违规类型、具体违规位置、命中文案或HTML证据，以及违规原因>"
   }
 }`
 }
@@ -313,14 +313,14 @@ Conduct a comprehensive analysis of the provided webpage content, focusing on de
 # Analysis Requirements:
 
 ## 1. Content Description
-- Based on HTML code analysis, provide a one-sentence concise summary of the webpage's main content or purpose
-- The description should be accurate, objective, and no more than 50 characters
+- Based on HTML code and screenshot analysis, provide a one-sentence concise summary of the webpage's visible content, business, product, or function
+- The description should be accurate, objective, and no more than 80 Chinese characters
 - The description must be written in Simplified Chinese
 
-## 2. Keyword Extraction
-- Extract keywords that best represent the webpage content
+## 2. Matched Keyword Extraction
+- Extract matched keywords or short evidence phrases that directly hit the custom rules
 - Output keywords as a JSON array of English strings, up to 5 items
-- Keywords should accurately reflect the core content of the webpage
+- Keywords should prefer exact matched words, visible text, button text, titles, navigation labels, payment words, action words, HTML text, or other evidence phrases
 
 ## 3. Custom Rule Detection
 Please strictly detect according to the following custom rules:
@@ -339,27 +339,27 @@ Please strictly detect according to the following custom rules:
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code. Stay vigilant; even seemingly normal websites may hide non-compliant content in the code.
 If the page shows access errors, is blank, or resources do not exist, it should be considered compliant.
 Output language requirements:
-- description must be Simplified Chinese.
-- keywords must be English keywords.
-- compliance.explanation must be Simplified Chinese and should state the matched custom rule type, matched keywords, and concrete evidence.
+- description must be Simplified Chinese and must precisely describe the webpage content, business, product, or function.
+- keywords must be English matched risk keywords or evidence phrases found in the screenshot or HTML. Use an empty array when no custom rule is matched.
+- compliance.explanation must be Simplified Chinese and should state the matched custom rule type, exact matched text, UI location or HTML evidence, and why that evidence violates the custom rule.
 
 # Output Requirements:
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<简体中文网页描述>",
-  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "description": "<简体中文网页内容精准描述>",
+  "keywords": ["<matched_keyword1>", "<matched_keyword2>", "<matched_keyword3>", "<matched_keyword4>", "<matched_keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<简体中文违规依据，说明命中的自定义规则类型、关键词和具体证据>"
+    "explanation": "<简体中文违规依据，说明命中的自定义规则类型、具体违规位置、命中文案或HTML证据，以及违规原因>"
   }
 }
 
 Notes:
 - compliance.is_illegal: Yes indicates non-compliant content found, No indicates compliant content
-- keywords: Up to 5 English keywords as a JSON array
-- description: Concise one-sentence Simplified Chinese description
-- compliance.explanation: Simplified Chinese explanation of matched rule types, matched keywords, and evidence`, rulesDescription, htmlContent)
+- keywords: Up to 5 English matched risk keywords or evidence phrases as a JSON array
+- description: Precise one-sentence Simplified Chinese webpage content description
+- compliance.explanation: Simplified Chinese explanation of matched rule types, exact locations, matched text, HTML or screenshot evidence, and violation reason`, rulesDescription, htmlContent)
 }
 
 func (r *ContentReviewer) callAPI(
@@ -542,7 +542,7 @@ var ReviewResultSchema = map[string]any{
 			"properties": map[string]any{
 				"description": map[string]any{
 					"type":        "string",
-					"description": "Simplified Chinese one-sentence description of webpage content or purpose",
+					"description": "Precise Simplified Chinese one-sentence description of webpage content, business, product, or function",
 				},
 				"keywords": map[string]any{
 					"type": "array",
@@ -550,7 +550,7 @@ var ReviewResultSchema = map[string]any{
 						"type": "string",
 					},
 					"maxItems":    5,
-					"description": "English keywords most relevant to webpage content, up to 5",
+					"description": "English matched risk keywords or evidence phrases found in the screenshot or HTML, up to 5",
 				},
 				"compliance": map[string]any{
 					"type": "object",
@@ -562,7 +562,7 @@ var ReviewResultSchema = map[string]any{
 						},
 						"explanation": map[string]any{
 							"type":        "string",
-							"description": "Simplified Chinese explanation listing violated categories, matched keywords, and concrete evidence",
+							"description": "Simplified Chinese explanation listing violated categories, exact violating locations, matched text, HTML or screenshot evidence, and violation reason",
 						},
 					},
 					"required": []string{
