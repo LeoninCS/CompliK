@@ -403,24 +403,14 @@ var _ = Describe("Processor", func() {
 			// Create mock cgroup file
 			cgroupContent := `12:memory:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope
 11:cpu:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope`
-
-			// Note: the function reads from /proc/{pid}/cgroup, not from tmpDir
-			// So we need to create the file in the actual /proc location
-			// For testing, we'll need to mock this or create a test helper
-			cgroupPath := filepath.Join("/proc", "1234", "cgroup")
-			os.WriteFile(cgroupPath, []byte(cgroupContent), 0644)
+			cgroupPath := filepath.Join(pidDir, "cgroup")
+			err := os.WriteFile(cgroupPath, []byte(cgroupContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
 
 			containerID := processor.getContainerIDFromPID(1234)
 
-			// Clean up if file was created
-			os.Remove(cgroupPath)
-
-			// This test will only work if we can write to /proc which is unlikely
-			// So we'll adjust the test to check the logic instead
-			if containerID != "" {
-				Expect(containerID).To(HaveLen(64))
-				Expect(isHexString(containerID)).To(BeTrue())
-			}
+			Expect(containerID).To(Equal("aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd"))
+			Expect(isHexString(containerID)).To(BeTrue())
 		})
 
 		It("should return empty string when cgroup file doesn't exist", func() {

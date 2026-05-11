@@ -13,10 +13,10 @@ data:
       log_level: {{ .Values.config.scanner.log_level | quote }}
 
     actions:
-      annotation:
-        enabled: {{ .Values.config.actions.annotation.enabled }}
-      forceDelete:
-        enabled: {{ .Values.config.actions.forceDelete.enabled }}
+      label:
+        enabled: {{ .Values.config.actions.label.enabled }}
+        data:
+          {{- toYaml .Values.config.actions.label.data | nindent 10 }}
 
     notifications:
       lark:

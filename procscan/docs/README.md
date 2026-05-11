@@ -6,7 +6,15 @@ This directory contains documentation for ProcScan - a lightweight security scan
 
 ### [Prometheus Metrics Documentation](PROMETHEUS_METRICS.md)
 
-Comprehensive guide to ProcScan's Prometheus metrics covering:
+Comprehensive guide to ProcScan's Prometheus metrics.
+
+### [Permissions Documentation](PERMISSIONS.md)
+
+Runtime RBAC, Pod security context, hostPath, CRI socket, Pod Security Admission, and deployment permission requirements for ProcScan.
+
+## Prometheus Metrics Overview
+
+The Prometheus metrics documentation covers:
 
 #### Metrics Categories
 1. **Scanner Status Metrics** - Monitor scanner health and availability
