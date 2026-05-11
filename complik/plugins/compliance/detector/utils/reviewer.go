@@ -183,6 +183,7 @@ func (r *ContentReviewer) buildSafetyPromptFromRules(
 # Important Notes:
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code.
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+The output card description and compliance explanation must be written in Chinese.
 
 # HTML Code Excerpt:
 %s
@@ -191,11 +192,11 @@ If the page shows 404 errors, various errors, blank pages, or missing resources,
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<Generated webpage description>",
+  "description": "<Generated webpage description in Chinese>",
   "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<Brief explanation listing specific violated categories and evidence>"
+    "explanation": "<Brief explanation in Chinese listing specific violated categories and evidence>"
   }
 }`, strings.TrimSpace(safetyPrompt), htmlBlock)
 }
@@ -230,6 +231,7 @@ Pay special attention to social platforms like Weibo, WeChat, Douyin, Kuaishou, 
 
 ## Special Reminder
 If the page shows 404 errors, various errors, blank pages, or missing resources, it should be considered compliant.
+The output card description and compliance explanation must be written in Chinese.
 
 # HTML Code Excerpt:
 ` + "```html\n" + htmlContent + "\n```" + `
@@ -238,11 +240,11 @@ If the page shows 404 errors, various errors, blank pages, or missing resources,
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "description": "<Generated webpage description>",
+  "description": "<Generated webpage description in Chinese>",
   "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
   "compliance": {
     "is_illegal": "<Yes/No>",
-    "explanation": "<Brief explanation listing specific violated categories and evidence>"
+    "explanation": "<Brief explanation in Chinese listing specific violated categories and evidence>"
   }
 }`
 }
@@ -329,20 +331,25 @@ Please strictly detect according to the following custom rules:
 # Important Notes:
 I am providing you with both a webpage screenshot and HTML code. Please analyze both sources comprehensively. Some content may be more obvious in the screenshot, while other content may need to be analyzed from the HTML code. Stay vigilant; even seemingly normal websites may hide non-compliant content in the code.
 If the page shows access errors, is blank, or resources do not exist, it should be considered compliant.
+The output card description and compliance explanation must be written in Chinese.
 
 # Output Requirements:
 Please output strictly in the following JSON format without any additional explanation or text:
 
 {
-  "is_compliant": true,
-  "keywords": "keyword1,keyword2,keyword3",
-  "description": "One-sentence description of webpage content"
+  "description": "<Generated webpage description in Chinese>",
+  "keywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
+  "compliance": {
+    "is_illegal": "<Yes/No>",
+    "explanation": "<Brief explanation in Chinese listing matched custom rule types, keywords, and evidence>"
+  }
 }
 
 Notes:
-- is_compliant: true indicates compliant content, false indicates non-compliant content found
-- keywords: Multiple keywords separated by commas
-- description: Concise one-sentence description`, rulesDescription, htmlContent)
+- compliance.is_illegal: Yes indicates non-compliant content found, No indicates compliant content
+- keywords: Up to 5 keywords as a JSON array
+- description: Concise one-sentence Chinese description
+- compliance.explanation: Chinese explanation of matched custom rule types, keywords, and evidence`, rulesDescription, htmlContent)
 }
 
 func (r *ContentReviewer) callAPI(
