@@ -32,13 +32,30 @@ daemonset:
     version: v1.0.0
 
   # Host network and PID
-  hostNetwork: true
+  hostNetwork: false
   hostPID: true
+
+  # Pod security context
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+    supplementalGroups:
+      - 0
 
   # Security context
   securityContext:
-    privileged: true
-    runAsUser: 0
+    privileged: false
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - SYS_PTRACE
+        - DAC_READ_SEARCH
 
   # Resource limits
   resources:
@@ -57,10 +74,10 @@ config:
     log_level: "info"
 
   actions:
-    annotation:
+    label:
       enabled: false
-    forceDelete:
-      enabled: false
+      data:
+        clawcloud.run/status: "locked"
 
   notifications:
     admin:

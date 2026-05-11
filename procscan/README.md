@@ -171,9 +171,27 @@ metadata:
 spec:
   template:
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        supplementalGroups:
+          - 0
       containers:
       - name: procscan
         image: procscan:latest
+        securityContext:
+          privileged: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - SYS_PTRACE
+              - DAC_READ_SEARCH
         volumeMounts:
         - name: proc-path
           mountPath: /host/proc
@@ -197,11 +215,8 @@ metadata:
   name: procscan
 rules:
 - apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch", "update", "patch"]
-- apiGroups: [""]
   resources: ["namespaces"]
-  verbs: ["get", "list", "update", "patch"]
+  verbs: ["get", "update"]
 ```
 
 ---
