@@ -22,7 +22,7 @@ import (
 
 const (
 	UsernameEnv = "ADMIN_BASIC_AUTH_USERNAME"
-	PasswordEnv = "ADMIN_BASIC_AUTH_PASSWORD"
+	PasswordEnv = "ADMIN_BASIC_AUTH_PASSWORD" // #nosec G101 -- env var key for external credential lookup
 )
 
 type BasicAuth struct {
@@ -33,12 +33,15 @@ type BasicAuth struct {
 func FromValues(username, password string) BasicAuth {
 	resolvedUsername := resolveValue(username)
 	resolvedPassword := resolveValue(password)
+
 	if resolvedUsername == "" {
 		resolvedUsername = strings.TrimSpace(os.Getenv(UsernameEnv))
 	}
+
 	if resolvedPassword == "" {
 		resolvedPassword = strings.TrimSpace(os.Getenv(PasswordEnv))
 	}
+
 	return BasicAuth{
 		Username: resolvedUsername,
 		Password: resolvedPassword,
@@ -49,13 +52,17 @@ func (a BasicAuth) Apply(req *http.Request) {
 	if req == nil || strings.TrimSpace(a.Username) == "" || strings.TrimSpace(a.Password) == "" {
 		return
 	}
+
 	req.SetBasicAuth(a.Username, a.Password)
 }
 
 func resolveValue(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if strings.HasPrefix(trimmed, "${") && strings.HasSuffix(trimmed, "}") {
-		return strings.TrimSpace(os.Getenv(strings.TrimSuffix(strings.TrimPrefix(trimmed, "${"), "}")))
+		return strings.TrimSpace(
+			os.Getenv(strings.TrimSuffix(strings.TrimPrefix(trimmed, "${"), "}")),
+		)
 	}
+
 	return trimmed
 }

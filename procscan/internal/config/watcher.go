@@ -54,9 +54,11 @@ func (w *Watcher) Start(ctx context.Context) error {
 		return err
 	}
 
-	legacy.L.WithField("path", w.loader.GetConfigPath()).Info("Started monitoring configuration file")
+	legacy.L.WithField("path", w.loader.GetConfigPath()).
+		Info("Started monitoring configuration file")
 
 	go w.watchLoop(ctx)
+
 	return nil
 }
 
@@ -85,6 +87,7 @@ func (w *Watcher) watchLoop(ctx context.Context) {
 			if !ok {
 				return
 			}
+
 			legacy.L.WithField("error", err).Error("File watcher error")
 		}
 	}
@@ -108,7 +111,8 @@ func (w *Watcher) handleFileChange() {
 
 	newConfig, err := w.loader.Load()
 	if err != nil {
-		legacy.L.WithField("error", err).Error("Failed to load new configuration during hot reload, continuing with old configuration")
+		legacy.L.WithField("error", err).
+			Error("Failed to load new configuration during hot reload, continuing with old configuration")
 		return
 	}
 

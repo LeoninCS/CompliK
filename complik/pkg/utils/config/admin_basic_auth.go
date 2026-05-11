@@ -22,7 +22,7 @@ import (
 
 const (
 	AdminBasicAuthUsernameEnv = "ADMIN_BASIC_AUTH_USERNAME"
-	AdminBasicAuthPasswordEnv = "ADMIN_BASIC_AUTH_PASSWORD"
+	AdminBasicAuthPasswordEnv = "ADMIN_BASIC_AUTH_PASSWORD" // #nosec G101 -- env var key for external credential lookup
 )
 
 type AdminBasicAuth struct {
@@ -33,12 +33,15 @@ type AdminBasicAuth struct {
 func ResolveAdminBasicAuth(username, password string) AdminBasicAuth {
 	resolvedUsername := resolveOptionalSecureValue(username)
 	resolvedPassword := resolveOptionalSecureValue(password)
+
 	if resolvedUsername == "" {
 		resolvedUsername = strings.TrimSpace(os.Getenv(AdminBasicAuthUsernameEnv))
 	}
+
 	if resolvedPassword == "" {
 		resolvedPassword = strings.TrimSpace(os.Getenv(AdminBasicAuthPasswordEnv))
 	}
+
 	return AdminBasicAuth{
 		Username: resolvedUsername,
 		Password: resolvedPassword,
@@ -49,6 +52,7 @@ func (a AdminBasicAuth) Apply(req *http.Request) {
 	if req == nil || strings.TrimSpace(a.Username) == "" || strings.TrimSpace(a.Password) == "" {
 		return
 	}
+
 	req.SetBasicAuth(a.Username, a.Password)
 }
 
@@ -57,9 +61,11 @@ func resolveOptionalSecureValue(value string) string {
 	if trimmed == "" {
 		return ""
 	}
+
 	resolved, err := GetSecureValue(trimmed)
 	if err != nil {
 		return ""
 	}
+
 	return strings.TrimSpace(resolved)
 }

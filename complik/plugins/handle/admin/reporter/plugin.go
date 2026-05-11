@@ -125,6 +125,7 @@ func (p *AdminReporterPlugin) loadConfig(setting string) error {
 	if configFromJSON.AdminTimeoutSecond > 0 {
 		p.reporterConfig.AdminTimeoutSecond = configFromJSON.AdminTimeoutSecond
 	}
+
 	p.applyAdminBasicAuthConfig(configFromJSON)
 
 	p.log.Info("Admin reporter configuration loaded", logger.Fields{

@@ -39,7 +39,7 @@ type Notifier struct {
 	Region     string
 }
 
-func NewNotifier(webhookURL string, region string) *Notifier {
+func NewNotifier(webhookURL, region string) *Notifier {
 	return &Notifier{
 		WebhookURL: webhookURL,
 		HTTPClient: &http.Client{

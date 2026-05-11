@@ -94,9 +94,11 @@ func LoadConfig(configPath string) (*Config, error) {
 	if config.Scanner.ProcPath == "" {
 		config.Scanner.ProcPath = "/host/proc"
 	}
+
 	if config.Scanner.ScanInterval == 0 {
 		config.Scanner.ScanInterval = 100 * time.Second
 	}
+
 	if config.Scanner.LogLevel == "" {
 		config.Scanner.LogLevel = "info"
 	}

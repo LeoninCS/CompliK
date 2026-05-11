@@ -18,6 +18,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -36,7 +37,8 @@ func NewK8sClient() (*kubernetes.Clientset, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		// If in-cluster config fails, try using local kubeconfig (for development)
-		legacy.L.WithField("error", err).Debug("Failed to get in-cluster config, trying local kubeconfig")
+		legacy.L.WithField("error", err).
+			Debug("Failed to get in-cluster config, trying local kubeconfig")
 
 		// Get kubeconfig file path
 		kubeconfig := os.Getenv("KUBECONFIG")
@@ -46,12 +48,23 @@ func NewK8sClient() (*kubernetes.Clientset, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to get user home directory: %w", err)
 			}
+
 			kubeconfig = filepath.Join(home, ".kube", "config")
 		}
 
+		kubeconfig = filepath.Clean(kubeconfig)
+		if !filepath.IsAbs(kubeconfig) {
+			return nil, fmt.Errorf("kubeconfig path must be absolute: %s", kubeconfig)
+		}
+
 		// Check if kubeconfig file exists
-		if _, err := os.Stat(kubeconfig); os.IsNotExist(err) {
-			return nil, fmt.Errorf("kubeconfig file not found at %s and in-cluster config not available", kubeconfig)
+		if _, err := os.Stat(
+			kubeconfig,
+		); os.IsNotExist(err) { // #nosec G703 -- cleaned absolute kubeconfig path
+			return nil, fmt.Errorf(
+				"kubeconfig file not found at %s and in-cluster config not available",
+				kubeconfig,
+			)
 		}
 
 		// Create config using local kubeconfig
@@ -60,7 +73,8 @@ func NewK8sClient() (*kubernetes.Clientset, error) {
 			return nil, fmt.Errorf("failed to build config from kubeconfig %s: %w", kubeconfig, err)
 		}
 
-		legacy.L.WithField("kubeconfig", kubeconfig).Info("Connected to Kubernetes cluster using local kubeconfig")
+		legacy.L.WithField("kubeconfig", kubeconfig).
+			Info("Connected to Kubernetes cluster using local kubeconfig")
 	} else {
 		legacy.L.Info("Connected to Kubernetes cluster using in-cluster config")
 	}
@@ -74,8 +88,14 @@ func NewK8sClient() (*kubernetes.Clientset, error) {
 }
 
 // LabelNamespace adds or updates labels on a Kubernetes namespace
-func LabelNamespace(clientset *kubernetes.Clientset, namespaceName string, labels map[string]string) error {
-	namespace, err := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
+func LabelNamespace(
+	clientset *kubernetes.Clientset,
+	namespaceName string,
+	labels map[string]string,
+) error {
+	namespace, err := clientset.CoreV1().
+		Namespaces().
+		Get(context.TODO(), namespaceName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get namespace %s: %w", namespaceName, err)
 	}
@@ -84,17 +104,19 @@ func LabelNamespace(clientset *kubernetes.Clientset, namespaceName string, label
 		namespace.Labels = make(map[string]string)
 	}
 
-	for key, value := range labels {
-		namespace.Labels[key] = value
-	}
+	maps.Copy(namespace.Labels, labels)
 
-	_, err = clientset.CoreV1().Namespaces().Update(context.TODO(), namespace, metav1.UpdateOptions{})
+	_, err = clientset.CoreV1().
+		Namespaces().
+		Update(context.TODO(), namespace, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update namespace %s: %w", namespaceName, err)
 	}
+
 	legacy.L.WithFields(logrus.Fields{
 		"namespace": namespaceName,
 		"labels":    labels,
 	}).Info("Successfully added labels to namespace")
+
 	return nil
 }

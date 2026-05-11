@@ -95,6 +95,7 @@ func (p *LarkPlugin) loadConfig(ctx context.Context, setting string) error {
 	if configFromJSON.Region != "" {
 		p.larkConfig.Region = configFromJSON.Region
 	}
+
 	if strings.TrimSpace(configFromJSON.AdminBaseURL) != "" {
 		if secureValue, err := config.GetSecureValue(configFromJSON.AdminBaseURL); err == nil {
 			p.larkConfig.AdminBaseURL = secureValue
@@ -102,13 +103,17 @@ func (p *LarkPlugin) loadConfig(ctx context.Context, setting string) error {
 			p.larkConfig.AdminBaseURL = configFromJSON.AdminBaseURL
 		}
 	}
+
 	if configFromJSON.AdminTimeoutSecond > 0 {
 		p.larkConfig.AdminTimeoutSecond = configFromJSON.AdminTimeoutSecond
 	}
+
 	p.applyAdminBasicAuthConfig(configFromJSON)
+
 	if err := p.applyNotificationsRuntimeConfig(ctx); err != nil {
 		return fmt.Errorf("failed to apply notifications runtime config from admin: %w", err)
 	}
+
 	if strings.TrimSpace(p.larkConfig.Webhook) == "" {
 		return errors.New("complik_notifications_runtime config missing webhook")
 	}
@@ -142,14 +147,18 @@ func (p *LarkPlugin) applyNotificationsRuntimeConfig(ctx context.Context) error 
 	if err != nil {
 		return err
 	}
+
 	if runtimeCfg == nil {
 		return errors.New("complik_notifications_runtime config not found in admin")
 	}
+
 	webhook := strings.TrimSpace(runtimeCfg.Webhook)
 	if webhook == "" {
 		return errors.New("complik_notifications_runtime config missing webhook")
 	}
+
 	p.larkConfig.Webhook = webhook
+
 	return nil
 }
 

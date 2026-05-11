@@ -37,15 +37,15 @@ type ConfigValidator struct {
 
 // ValidationRule is the interface for validation rules
 type ValidationRule interface {
-	Validate(value interface{}) *ValidationError
+	Validate(value any) *ValidationError
 }
 
 // ValidationError represents a validation error
 type ValidationError struct {
-	Field   string      // Field name
-	Value   interface{} // Field value
-	Message string      // Error message
-	Code    string      // Error code
+	Field   string // Field name
+	Value   any    // Field value
+	Message string // Error message
+	Code    string // Error code
 }
 
 func (e *ValidationError) Error() string {
@@ -60,6 +60,7 @@ func NewConfigValidator() *ConfigValidator {
 
 	// Register default validation rules
 	validator.registerDefaultRules()
+
 	return validator
 }
 
@@ -112,6 +113,7 @@ func (v *ConfigValidator) AddRule(field string, rule ValidationRule) {
 	if v.rules[field] == nil {
 		v.rules[field] = make([]ValidationRule, 0)
 	}
+
 	v.rules[field] = append(v.rules[field], rule)
 }
 
@@ -164,7 +166,10 @@ func (v *ConfigValidator) validateScanner(scanner models.ScannerConfig, result *
 
 	// Check if proc path is empty
 	if scanner.ProcPath == "" {
-		result.Warnings = append(result.Warnings, "scanner.proc_path is empty, will use default value /host/proc")
+		result.Warnings = append(
+			result.Warnings,
+			"scanner.proc_path is empty, will use default value /host/proc",
+		)
 	}
 }
 
@@ -177,25 +182,40 @@ func (v *ConfigValidator) validateActions(actions models.ActionsConfig, result *
 
 	// Security check: when label functionality is working normally, security labels will be automatically added
 	if actions.Label.Enabled {
-		result.Warnings = append(result.Warnings, "Label functionality is enabled, detected threats will be marked and await external controller processing")
+		result.Warnings = append(
+			result.Warnings,
+			"Label functionality is enabled, detected threats will be marked and await external controller processing",
+		)
 	}
 }
 
 // validateNotifications validates notifications configuration
-func (v *ConfigValidator) validateNotifications(notifications models.NotificationsConfig, result *ValidationResult) {
+func (v *ConfigValidator) validateNotifications(
+	notifications models.NotificationsConfig,
+	result *ValidationResult,
+) {
 	// Validate Lark webhook
-	if err := v.validateField("notifications.lark.webhook", notifications.Lark.Webhook); err != nil {
+	if err := v.validateField(
+		"notifications.lark.webhook",
+		notifications.Lark.Webhook,
+	); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
 
 	// Check notification configuration
 	if notifications.Lark.Webhook == "" {
-		result.Warnings = append(result.Warnings, "Notification webhook not configured, alerts cannot be sent")
+		result.Warnings = append(
+			result.Warnings,
+			"Notification webhook not configured, alerts cannot be sent",
+		)
 	}
 }
 
 // validateDetectionRules validates detection rules
-func (v *ConfigValidator) validateDetectionRules(rules models.DetectionRules, result *ValidationResult) {
+func (v *ConfigValidator) validateDetectionRules(
+	rules models.DetectionRules,
+	result *ValidationResult,
+) {
 	// Validate blacklist rules
 	v.validateRuleSet("detectionRules.blacklist", rules.Blacklist, result)
 
@@ -204,24 +224,35 @@ func (v *ConfigValidator) validateDetectionRules(rules models.DetectionRules, re
 
 	// Check rule logic
 	if len(rules.Blacklist.Processes) == 0 && len(rules.Blacklist.Keywords) == 0 {
-		result.Warnings = append(result.Warnings, "Blacklist rules are empty, may not detect suspicious processes")
+		result.Warnings = append(
+			result.Warnings,
+			"Blacklist rules are empty, may not detect suspicious processes",
+		)
 	}
 }
 
 // validateRuleSet validates a rule set
-func (v *ConfigValidator) validateRuleSet(prefix string, ruleSet models.RuleSet, result *ValidationResult) {
+func (v *ConfigValidator) validateRuleSet(
+	prefix string,
+	ruleSet models.RuleSet,
+	result *ValidationResult,
+) {
 	if err := v.validateField(prefix+".processes", ruleSet.Processes); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
+
 	if err := v.validateField(prefix+".keywords", ruleSet.Keywords); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
+
 	if err := v.validateField(prefix+".commands", ruleSet.Commands); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
+
 	if err := v.validateField(prefix+".namespaces", ruleSet.Namespaces); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
+
 	if err := v.validateField(prefix+".podNames", ruleSet.PodNames); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
@@ -231,12 +262,18 @@ func (v *ConfigValidator) validateRuleSet(prefix string, ruleSet models.RuleSet,
 func (v *ConfigValidator) validateCrossFields(config *models.Config, result *ValidationResult) {
 	// Check if scan interval is reasonable
 	if config.Scanner.ScanInterval < 10*time.Second {
-		result.Warnings = append(result.Warnings, "Scan interval is too short, may increase system load")
+		result.Warnings = append(
+			result.Warnings,
+			"Scan interval is too short, may increase system load",
+		)
 	}
 
 	// Check action configuration logic
 	if config.Actions.Label.Enabled {
-		result.Warnings = append(result.Warnings, "Detected threats will be marked, please ensure external controller is monitoring these labels")
+		result.Warnings = append(
+			result.Warnings,
+			"Detected threats will be marked, please ensure external controller is monitoring these labels",
+		)
 	}
 
 	// Check for conflicts between blacklist and whitelist
@@ -244,7 +281,10 @@ func (v *ConfigValidator) validateCrossFields(config *models.Config, result *Val
 }
 
 // validateRuleConflicts validates rule conflicts
-func (v *ConfigValidator) validateRuleConflicts(rules models.DetectionRules, result *ValidationResult) {
+func (v *ConfigValidator) validateRuleConflicts(
+	rules models.DetectionRules,
+	result *ValidationResult,
+) {
 	// Check process name conflicts
 	blacklistProcesses := make(map[string]bool)
 	for _, process := range rules.Blacklist.Processes {
@@ -260,7 +300,7 @@ func (v *ConfigValidator) validateRuleConflicts(rules models.DetectionRules, res
 }
 
 // validateField validates a single field
-func (v *ConfigValidator) validateField(field string, value interface{}) *ValidationError {
+func (v *ConfigValidator) validateField(field string, value any) *ValidationError {
 	rules, exists := v.rules[field]
 	if !exists {
 		return nil // No validation rules, consider valid
@@ -287,7 +327,10 @@ func (v *ConfigValidator) ValidateFile(configPath string) *ValidationResult {
 
 	// Check file extension
 	if !strings.HasSuffix(configPath, ".yaml") && !strings.HasSuffix(configPath, ".yml") {
-		result.Warnings = append(result.Warnings, "Configuration file should use .yaml or .yml extension")
+		result.Warnings = append(
+			result.Warnings,
+			"Configuration file should use .yaml or .yml extension",
+		)
 	}
 
 	return result

@@ -106,6 +106,7 @@ func (p *SafetyPlugin) loadConfig(ctx context.Context, setting string) error {
 	if safetyConfig.MaxWorkers > 0 {
 		p.safetyConfig.MaxWorkers = safetyConfig.MaxWorkers
 	}
+
 	if strings.TrimSpace(safetyConfig.AdminBaseURL) != "" {
 		if secureValue, err := config.GetSecureValue(safetyConfig.AdminBaseURL); err == nil {
 			p.safetyConfig.AdminBaseURL = secureValue
@@ -113,16 +114,21 @@ func (p *SafetyPlugin) loadConfig(ctx context.Context, setting string) error {
 			p.safetyConfig.AdminBaseURL = safetyConfig.AdminBaseURL
 		}
 	}
+
 	if safetyConfig.AdminTimeoutSecond > 0 {
 		p.safetyConfig.AdminTimeoutSecond = safetyConfig.AdminTimeoutSecond
 	}
+
 	p.applyAdminBasicAuthConfig(safetyConfig)
+
 	if err := p.applyModelRuntimeConfig(ctx); err != nil {
 		return fmt.Errorf("failed to apply model runtime config from admin: %w", err)
 	}
+
 	if err := p.applySafetyPromptRules(ctx); err != nil {
 		return fmt.Errorf("failed to apply safety prompt rules from admin: %w", err)
 	}
+
 	if strings.TrimSpace(p.safetyConfig.APIKey) == "" ||
 		strings.TrimSpace(p.safetyConfig.APIBase) == "" ||
 		strings.TrimSpace(p.safetyConfig.APIPath) == "" ||
@@ -166,9 +172,11 @@ func (p *SafetyPlugin) applyModelRuntimeConfig(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	if modelCfg == nil {
 		return errors.New("model_runtime config not found in admin")
 	}
+
 	if strings.TrimSpace(modelCfg.APIKey) != "" {
 		if secureValue, err := config.GetSecureValue(modelCfg.APIKey); err == nil {
 			p.safetyConfig.APIKey = secureValue
@@ -176,15 +184,19 @@ func (p *SafetyPlugin) applyModelRuntimeConfig(ctx context.Context) error {
 			p.safetyConfig.APIKey = modelCfg.APIKey
 		}
 	}
+
 	if strings.TrimSpace(modelCfg.APIBase) != "" {
 		p.safetyConfig.APIBase = strings.TrimSpace(modelCfg.APIBase)
 	}
+
 	if strings.TrimSpace(modelCfg.APIPath) != "" {
 		p.safetyConfig.APIPath = strings.TrimSpace(modelCfg.APIPath)
 	}
+
 	if strings.TrimSpace(modelCfg.Model) != "" {
 		p.safetyConfig.Model = strings.TrimSpace(modelCfg.Model)
 	}
+
 	return nil
 }
 
@@ -199,6 +211,7 @@ func (p *SafetyPlugin) applySafetyPromptRules(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	if len(cfgs) == 0 {
 		return errors.New("no safety rules found in admin configs")
 	}
@@ -207,6 +220,7 @@ func (p *SafetyPlugin) applySafetyPromptRules(ctx context.Context) error {
 		name    string
 		content string
 	}
+
 	rules := make([]ruleItem, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		var payload struct {
@@ -217,8 +231,10 @@ func (p *SafetyPlugin) applySafetyPromptRules(ctx context.Context) error {
 				"config_name": cfg.ConfigName,
 				"error":       err.Error(),
 			})
+
 			continue
 		}
+
 		content := strings.TrimSpace(payload.Content)
 		if content == "" {
 			p.log.Warn("Skip empty safety rule content", logger.Fields{
@@ -226,8 +242,10 @@ func (p *SafetyPlugin) applySafetyPromptRules(ctx context.Context) error {
 			})
 			continue
 		}
+
 		rules = append(rules, ruleItem{name: strings.TrimSpace(cfg.ConfigName), content: content})
 	}
+
 	if len(rules) == 0 {
 		return errors.New("no valid safety rules found in admin configs")
 	}
@@ -235,12 +253,15 @@ func (p *SafetyPlugin) applySafetyPromptRules(ctx context.Context) error {
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].name < rules[j].name
 	})
+
 	parts := make([]string, 0, len(rules))
 	for _, rule := range rules {
 		parts = append(parts, rule.content)
 	}
+
 	p.safetyPrompt = strings.Join(parts, "\n\n")
 	p.log.Info("Applied safety rules from admin", logger.Fields{"rule_count": len(rules)})
+
 	return nil
 }
 

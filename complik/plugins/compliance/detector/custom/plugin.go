@@ -99,6 +99,7 @@ func (p *CustomPlugin) loadConfig(ctx context.Context, setting string) error {
 	if configFromJSON.MaxWorkers > 0 {
 		p.customConfig.MaxWorkers = configFromJSON.MaxWorkers
 	}
+
 	if strings.TrimSpace(configFromJSON.AdminBaseURL) != "" {
 		if secureValue, err := config.GetSecureValue(configFromJSON.AdminBaseURL); err == nil {
 			p.customConfig.AdminBaseURL = secureValue
@@ -106,19 +107,24 @@ func (p *CustomPlugin) loadConfig(ctx context.Context, setting string) error {
 			p.customConfig.AdminBaseURL = configFromJSON.AdminBaseURL
 		}
 	}
+
 	if configFromJSON.AdminTimeoutSecond > 0 {
 		p.customConfig.AdminTimeoutSecond = configFromJSON.AdminTimeoutSecond
 	}
+
 	p.applyAdminBasicAuthConfig(configFromJSON)
+
 	if err := p.applyModelRuntimeConfig(ctx); err != nil {
 		return fmt.Errorf("failed to apply model runtime config from admin: %w", err)
 	}
+
 	if strings.TrimSpace(p.customConfig.APIKey) == "" ||
 		strings.TrimSpace(p.customConfig.APIBase) == "" ||
 		strings.TrimSpace(p.customConfig.APIPath) == "" ||
 		strings.TrimSpace(p.customConfig.Model) == "" {
 		return errors.New("model_runtime config from admin is incomplete")
 	}
+
 	if err := p.readFromAdminConfigs(ctx); err != nil {
 		return fmt.Errorf("failed to load custom rules from admin: %w", err)
 	}
@@ -130,6 +136,7 @@ func (p *CustomPlugin) loadConfig(ctx context.Context, setting string) error {
 		"max_workers":    p.customConfig.MaxWorkers,
 		"keyword_count":  len(p.keywords),
 	})
+
 	return nil
 }
 
@@ -155,6 +162,7 @@ func (p *CustomPlugin) Start(
 	eventBus *eventbus.EventBus,
 ) error {
 	p.log.Info("Starting custom detector plugin")
+
 	if err := p.loadConfig(ctx, cfg.Settings); err != nil {
 		p.log.Error("Failed to load configuration", logger.Fields{"error": err.Error()})
 		return fmt.Errorf("failed to load configuration: %w", err)
@@ -184,7 +192,9 @@ func (p *CustomPlugin) Start(
 				p.log.Info("Event subscription channel closed")
 				return nil
 			}
+
 			semaphore <- struct{}{}
+
 			go func(e eventbus.Event) {
 				defer func() { <-semaphore }()
 				defer func() {
@@ -202,11 +212,13 @@ func (p *CustomPlugin) Start(
 						"expected": "*models.CollectorInfo",
 						"actual":   fmt.Sprintf("%T", e.Payload),
 					})
+
 					return
 				}
 
 				startTime := time.Now()
 				result, err := p.customJudge(ctx, res)
+
 				duration := time.Since(startTime)
 				if err != nil {
 					p.log.Error("Custom judgement failed", logger.Fields{
@@ -227,10 +239,13 @@ func (p *CustomPlugin) Start(
 			}(event)
 		case <-ctx.Done():
 			p.log.Info("Shutting down custom detector plugin")
+
 			for range p.customConfig.MaxWorkers {
 				semaphore <- struct{}{}
 			}
+
 			p.log.Debug("All workers finished")
+
 			return nil
 		}
 	}
@@ -257,6 +272,7 @@ func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
 		name string
 		rule utils.CustomKeywordRule
 	}
+
 	rules := make([]ruleItem, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		var payload struct {
@@ -267,18 +283,23 @@ func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
 				"config_name": cfg.ConfigName,
 				"error":       err.Error(),
 			})
+
 			continue
 		}
+
 		rule, parseErr := parseCustomRuleContent(cfg.ConfigName, payload.Content)
 		if parseErr != nil {
 			p.log.Warn("Failed to parse custom rule content", logger.Fields{
 				"config_name": cfg.ConfigName,
 				"error":       parseErr.Error(),
 			})
+
 			continue
 		}
+
 		rules = append(rules, ruleItem{name: cfg.ConfigName, rule: rule})
 	}
+
 	if len(rules) == 0 {
 		return errors.New("no valid custom rules found in admin configs")
 	}
@@ -286,11 +307,14 @@ func (p *CustomPlugin) readFromAdminConfigs(ctx context.Context) error {
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].name < rules[j].name
 	})
+
 	next := make([]utils.CustomKeywordRule, 0, len(rules))
 	for _, item := range rules {
 		next = append(next, item.rule)
 	}
+
 	p.keywords = next
+
 	return nil
 }
 
@@ -301,6 +325,7 @@ func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule
 	}
 
 	lines := strings.Split(text, "\n")
+
 	var (
 		ruleType        string
 		ruleDescription string
@@ -312,10 +337,12 @@ func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule
 		if trimmed == "" {
 			continue
 		}
-		if strings.HasPrefix(trimmed, "###") {
-			ruleType = strings.TrimSpace(strings.TrimPrefix(trimmed, "###"))
+
+		if after, ok := strings.CutPrefix(trimmed, "###"); ok {
+			ruleType = strings.TrimSpace(after)
 			continue
 		}
+
 		key, value, ok := parseRuleKeyValue(trimmed)
 		if ok {
 			switch normalizeRuleKey(key) {
@@ -336,6 +363,7 @@ func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule
 				continue
 			}
 		}
+
 		unlabeledLines = append(unlabeledLines, trimmed)
 	}
 
@@ -343,9 +371,11 @@ func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule
 		ruleType = unlabeledLines[0]
 		unlabeledLines = unlabeledLines[1:]
 	}
+
 	if len(keywordSegments) == 0 && len(unlabeledLines) > 0 {
 		keywordSegments = append(keywordSegments, strings.Join(unlabeledLines, "\n"))
 	}
+
 	keywords := splitRuleKeywords(strings.Join(keywordSegments, "\n"))
 	if len(keywords) == 0 {
 		return utils.CustomKeywordRule{}, errors.New("keywords not found in content")
@@ -354,8 +384,9 @@ func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule
 	if ruleType == "" {
 		ruleType = deriveRuleTypeFromConfigName(configName)
 	}
+
 	if ruleDescription == "" {
-		ruleDescription = fmt.Sprintf("%s关键词检测规则", ruleType)
+		ruleDescription = ruleType + "关键词检测规则"
 	}
 
 	return utils.CustomKeywordRule{
@@ -365,12 +396,14 @@ func parseCustomRuleContent(configName, content string) (utils.CustomKeywordRule
 	}, nil
 }
 
-func parseRuleKeyValue(line string) (key string, value string, ok bool) {
+func parseRuleKeyValue(line string) (key, value string, ok bool) {
 	cleaned := strings.TrimSpace(line)
+
 	cleaned = strings.TrimLeft(cleaned, "-* ")
 	if cleaned == "" {
 		return "", "", false
 	}
+
 	for _, sep := range []string{":", "："} {
 		if idx := strings.Index(cleaned, sep); idx > 0 {
 			key = strings.TrimSpace(cleaned[:idx])
@@ -378,6 +411,7 @@ func parseRuleKeyValue(line string) (key string, value string, ok bool) {
 			return key, value, key != ""
 		}
 	}
+
 	return "", "", false
 }
 
@@ -392,9 +426,11 @@ func looksLikeRuleType(line string) bool {
 	if candidate == "" {
 		return false
 	}
+
 	if strings.ContainsAny(candidate, ",，;；|") {
 		return false
 	}
+
 	return len([]rune(candidate)) <= 32
 }
 
@@ -403,20 +439,25 @@ func deriveRuleTypeFromConfigName(configName string) string {
 	if name == "" {
 		return "custom"
 	}
+
 	for _, sep := range []string{"/", ":"} {
 		if parts := strings.Split(name, sep); len(parts) > 0 {
 			name = parts[len(parts)-1]
 		}
 	}
+
 	if parts := strings.Split(name, "."); len(parts) > 0 {
 		name = parts[len(parts)-1]
 	}
+
 	name = regexp.MustCompile(`(?i)[_-]v\d+$`).ReplaceAllString(name, "")
 	name = regexp.MustCompile(`^\d+[_-]?`).ReplaceAllString(name, "")
+
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "custom"
 	}
+
 	return name
 }
 
@@ -425,6 +466,7 @@ func splitRuleKeywords(raw string) []string {
 	if text == "" {
 		return nil
 	}
+
 	normalized := strings.NewReplacer(
 		"，", ",",
 		"、", ",",
@@ -433,24 +475,31 @@ func splitRuleKeywords(raw string) []string {
 		"|", ",",
 		"\r", "\n",
 	).Replace(text)
+
 	parts := regexp.MustCompile(`[,\n]+`).Split(normalized, -1)
 	if len(parts) == 1 && strings.Contains(normalized, ".") {
 		parts = strings.Split(normalized, ".")
 	}
+
 	seen := make(map[string]struct{}, len(parts))
+
 	result := make([]string, 0, len(parts))
 	for _, part := range parts {
 		kw := strings.TrimSpace(strings.Trim(part, `"'`))
 		if kw == "" {
 			continue
 		}
+
 		key := strings.ToLower(kw)
 		if _, exists := seen[key]; exists {
 			continue
 		}
+
 		seen[key] = struct{}{}
+
 		result = append(result, kw)
 	}
+
 	return result
 }
 
@@ -464,9 +513,11 @@ func (p *CustomPlugin) applyModelRuntimeConfig(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	if modelCfg == nil {
 		return errors.New("model_runtime config not found in admin")
 	}
+
 	if strings.TrimSpace(modelCfg.APIKey) != "" {
 		if secureValue, err := config.GetSecureValue(modelCfg.APIKey); err == nil {
 			p.customConfig.APIKey = secureValue
@@ -474,15 +525,19 @@ func (p *CustomPlugin) applyModelRuntimeConfig(ctx context.Context) error {
 			p.customConfig.APIKey = modelCfg.APIKey
 		}
 	}
+
 	if strings.TrimSpace(modelCfg.APIBase) != "" {
 		p.customConfig.APIBase = strings.TrimSpace(modelCfg.APIBase)
 	}
+
 	if strings.TrimSpace(modelCfg.APIPath) != "" {
 		p.customConfig.APIPath = strings.TrimSpace(modelCfg.APIPath)
 	}
+
 	if strings.TrimSpace(modelCfg.Model) != "" {
 		p.customConfig.Model = strings.TrimSpace(modelCfg.Model)
 	}
+
 	return nil
 }
 
@@ -501,6 +556,7 @@ func (p *CustomPlugin) customJudge(
 
 	if collector.IsEmpty {
 		p.log.Debug("Skipping empty content", logger.Fields{"host": collector.Host})
+
 		return &models.DetectorInfo{
 			DiscoveryName: collector.DiscoveryName,
 			CollectorName: collector.CollectorName,
@@ -532,5 +588,6 @@ func (p *CustomPlugin) customJudge(
 			Keywords:      []string{},
 		}, err
 	}
+
 	return result, nil
 }
