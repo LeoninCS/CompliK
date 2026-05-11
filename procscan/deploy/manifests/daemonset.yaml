@@ -20,7 +20,12 @@ spec:
         component: security-scanner
         managed-by: block-procscan
     spec:
-      hostNetwork: true
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        supplementalGroups:
+          - 0
+      hostNetwork: false
       hostPID: true
       serviceAccountName: block-procscan
       containers:
@@ -46,8 +51,18 @@ spec:
                   name: sealos-complik-admin-auth
                   key: password
           securityContext:
-            privileged: true
-            runAsUser: 0
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - SYS_PTRACE
+                - DAC_READ_SEARCH
           ports:
             - name: metrics
               containerPort: 8080

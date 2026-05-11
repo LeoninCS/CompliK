@@ -409,9 +409,17 @@ var _ = Describe("Processor", func() {
 			pidDir := filepath.Join(tmpDir, "1234")
 			mustMkdir(pidDir)
 
-			Skip(
-				"getContainerIDFromPID reads the live /proc filesystem; this needs an injectable cgroup reader",
-			)
+			// Create mock cgroup file
+			cgroupContent := `12:memory:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope
+11:cpu:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope`
+			cgroupPath := filepath.Join(pidDir, "cgroup")
+			err := os.WriteFile(cgroupPath, []byte(cgroupContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			containerID := processor.getContainerIDFromPID(1234)
+
+			Expect(containerID).To(Equal("aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd"))
+			Expect(isHexString(containerID)).To(BeTrue())
 		})
 
 		It("should return empty string when cgroup file doesn't exist", func() {
