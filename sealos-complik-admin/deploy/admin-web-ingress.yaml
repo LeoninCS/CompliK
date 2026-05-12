@@ -50,6 +50,8 @@ kind: Ingress
 metadata:
   name: complik-admin
   namespace: sealos
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
 spec:
   ingressClassName: nginx
   rules:

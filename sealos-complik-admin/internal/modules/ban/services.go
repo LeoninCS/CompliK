@@ -23,9 +23,7 @@ var (
 )
 
 const (
-	defaultBanObjectPrefix        = "bans"
-	maxBanScreenshotCount         = 6
-	maxBanScreenshotFileSizeBytes = 10 << 20 // 10MB
+	defaultBanObjectPrefix = "bans"
 )
 
 type Service struct {
@@ -238,14 +236,6 @@ func normalizeBanInput(
 		return nil, ErrBanInvalidInput
 	}
 
-	if len(normalizedScreenshotURLs) > maxBanScreenshotCount {
-		return nil, fmt.Errorf(
-			"%w: screenshot count must be at most %d",
-			ErrBanInvalidInput,
-			maxBanScreenshotCount,
-		)
-	}
-
 	return &normalizedBanInput{
 		Namespace:      trimmedNamespace,
 		Reason:         trimmedReason,
@@ -265,14 +255,6 @@ func (s *Service) uploadScreenshots(
 		return nil, nil
 	}
 
-	if len(screenshots) > maxBanScreenshotCount {
-		return nil, fmt.Errorf(
-			"%w: screenshot count must be at most %d",
-			ErrBanInvalidInput,
-			maxBanScreenshotCount,
-		)
-	}
-
 	if s.uploader == nil {
 		return nil, ErrBanUploadDisabled
 	}
@@ -282,14 +264,6 @@ func (s *Service) uploadScreenshots(
 		contentType, ok := screenshotContentType(screenshot)
 		if !ok {
 			return nil, ErrBanInvalidFile
-		}
-
-		if screenshot.Size <= 0 || screenshot.Size > maxBanScreenshotFileSizeBytes {
-			return nil, fmt.Errorf(
-				"%w: screenshot size must be between 1 byte and %d bytes",
-				ErrBanInvalidFile,
-				maxBanScreenshotFileSizeBytes,
-			)
 		}
 
 		file, err := screenshot.Open()

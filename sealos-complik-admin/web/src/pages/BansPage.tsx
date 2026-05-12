@@ -75,7 +75,8 @@ export function BansPage() {
       return;
     }
 
-    setScreenshots((current) => [...current, ...files].slice(0, 6));
+    setFormError(null);
+    setScreenshots((current) => [...current, ...files]);
   };
 
   const removeScreenshot = (target: File) => {
@@ -127,11 +128,6 @@ export function BansPage() {
       setFormError("namespace、描述、开始时间、操作人均为必填。");
       return;
     }
-    if (screenshots.length > 6) {
-      setFormError("截图最多上传 6 张。");
-      return;
-    }
-
     setSubmitting(true);
     setFormError(null);
     try {
@@ -360,7 +356,7 @@ export function BansPage() {
                   event.target.value = "";
                 }}
               />
-              <div className="muted-text">支持 PNG、JPG、WEBP、GIF，最多 6 张。文件选择和粘贴图片会合并到同一列表。</div>
+              <div className="muted-text">支持 PNG、JPG、WEBP、GIF。文件选择和粘贴图片会合并到同一列表。</div>
               {screenshots.length > 0 ? (
                 <div className="upload-list">
                   {screenshots.map((file) => (
