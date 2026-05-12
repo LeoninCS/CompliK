@@ -104,6 +104,38 @@ function getTimeMs(value: number | null | undefined, fallback: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : toTimestamp(fallback);
 }
 
+const disposalActionRanks = {
+  ban: 0,
+  unban: 1,
+} as const;
+
+function getDisposalActionSequenceStep(bans: BanRecord[], unbans: UnbanRecord[]) {
+  let maxApiId = 0;
+  bans.forEach((item) => {
+    maxApiId = Math.max(maxApiId, item.apiId);
+  });
+  unbans.forEach((item) => {
+    maxApiId = Math.max(maxApiId, item.apiId);
+  });
+
+  return maxApiId + 1;
+}
+
+function getDisposalActionSequence(kind: keyof typeof disposalActionRanks, apiId: number, sequenceStep: number) {
+  return disposalActionRanks[kind] * sequenceStep + apiId;
+}
+
+function getBanEndTimeMs(item: BanRecord) {
+  return item.banEndTime ? getTimeMs(item.banEndTimeMs, item.banEndTime) : undefined;
+}
+
+function isBanInEffect(item: BanRecord, nowMs: number) {
+  const startMs = getTimeMs(item.banStartTimeMs, item.banStartTime);
+  const endMs = getBanEndTimeMs(item);
+
+  return startMs <= nowMs && (endMs === undefined || endMs > nowMs);
+}
+
 function compareNewestFirst(
   a: { sortTime: number; sequence: number },
   b: { sortTime: number; sequence: number },
@@ -128,7 +160,64 @@ type DisposalAction = {
   sequence: number;
 };
 
+type DisposalStatusAction = {
+  namespace: string;
+  kind: keyof typeof disposalActionRanks;
+  apiId: number;
+  sortTime: number;
+};
+
+function isDisposalStatusActionNewer(candidate: DisposalStatusAction, current: DisposalStatusAction) {
+  if (candidate.sortTime !== current.sortTime) {
+    return candidate.sortTime > current.sortTime;
+  }
+
+  const rankDiff = disposalActionRanks[candidate.kind] - disposalActionRanks[current.kind];
+  if (rankDiff !== 0) {
+    return rankDiff > 0;
+  }
+
+  return candidate.apiId > current.apiId;
+}
+
+function recordDisposalStatusAction(
+  latestActions: Map<string, DisposalStatusAction>,
+  action: DisposalStatusAction,
+) {
+  const current = latestActions.get(action.namespace);
+  if (current === undefined || isDisposalStatusActionNewer(action, current)) {
+    latestActions.set(action.namespace, action);
+  }
+}
+
+function buildLatestDisposalStatusActionsByNamespace(bans: BanRecord[], unbans: UnbanRecord[], nowMs: number) {
+  const latestActions = new Map<string, DisposalStatusAction>();
+
+  bans.forEach((item) => {
+    if (isBanInEffect(item, nowMs)) {
+      recordDisposalStatusAction(latestActions, {
+        namespace: item.namespace,
+        kind: "ban",
+        apiId: item.apiId,
+        sortTime: getTimeMs(item.createdAtMs, item.createdAt),
+      });
+    }
+  });
+
+  unbans.forEach((item) => {
+    recordDisposalStatusAction(latestActions, {
+      namespace: item.namespace,
+      kind: "unban",
+      apiId: item.apiId,
+      sortTime: getTimeMs(item.createdAtMs, item.createdAt),
+    });
+  });
+
+  return latestActions;
+}
+
 function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
+  const sequenceStep = getDisposalActionSequenceStep(bans, unbans);
   const actions: DisposalAction[] = [
     ...bans.map((item) => ({
       id: `timeline-${item.id}`,
@@ -139,7 +228,7 @@ function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
       time: item.createdAt,
       tone: "warn" as const,
       sortTime: getTimeMs(item.createdAtMs, item.createdAt),
-      sequence: item.apiId * 2,
+      sequence: getDisposalActionSequence("ban", item.apiId, sequenceStep),
     })),
     ...unbans.map((item) => ({
       id: `timeline-${item.id}`,
@@ -150,28 +239,22 @@ function buildDisposalActions(bans: BanRecord[], unbans: UnbanRecord[]) {
       time: item.createdAt,
       tone: "success" as const,
       sortTime: getTimeMs(item.createdAtMs, item.createdAt),
-      sequence: item.apiId * 2 + 1,
+      sequence: getDisposalActionSequence("unban", item.apiId, sequenceStep),
     })),
   ];
 
   return actions.sort(compareNewestFirst);
 }
 
-function isNamespaceBanned(namespace: string, bans: BanRecord[], unbans: UnbanRecord[]) {
-  const latestAction = buildDisposalActions(
-    bans.filter((item) => item.namespace === namespace),
-    unbans.filter((item) => item.namespace === namespace),
-  )[0];
-
-  return latestAction?.kind === "ban";
-}
-
-function buildStats(violations: ViolationRecord[], bans: BanRecord[], unbans: UnbanRecord[]): StatCardItem[] {
+function buildStats(
+  violations: ViolationRecord[],
+  bans: BanRecord[],
+  unbans: UnbanRecord[],
+  nowMs: number,
+  latestDisposalStatusActions: Map<string, DisposalStatusAction>,
+): StatCardItem[] {
   const violationNamespaces = new Set(violations.map((item) => item.namespace));
-  const actionNamespaces = new Set<string>();
-  bans.forEach((item) => actionNamespaces.add(item.namespace));
-  unbans.forEach((item) => actionNamespaces.add(item.namespace));
-  const todayStart = new Date();
+  const todayStart = new Date(nowMs);
   todayStart.setHours(0, 0, 0, 0);
   const todayStartTime = todayStart.getTime();
 
@@ -179,7 +262,7 @@ function buildStats(violations: ViolationRecord[], bans: BanRecord[], unbans: Un
   const todayActionCount =
     bans.filter((item) => getTimeMs(item.createdAtMs, item.createdAt) >= todayStartTime).length +
     unbans.filter((item) => getTimeMs(item.createdAtMs, item.createdAt) >= todayStartTime).length;
-  const activeBanCount = [...actionNamespaces].filter((namespace) => isNamespaceBanned(namespace, bans, unbans)).length;
+  const activeBanCount = [...latestDisposalStatusActions.values()].filter((action) => action.kind === "ban").length;
 
   return [
     {
@@ -239,6 +322,7 @@ function buildLatestActions(
   unbans: UnbanRecord[],
   commitments: CommitmentRecord[],
 ): ActivityItem[] {
+  const sequenceStep = getDisposalActionSequenceStep(bans, unbans);
   const actions: Array<ActivityItem & { sortTime: number; sequence: number }> = [
     ...bans.map((item) => ({
       id: item.id,
@@ -248,7 +332,7 @@ function buildLatestActions(
       tone: "warn" as const,
       targetPath: "/bans",
       sortTime: getTimeMs(item.createdAtMs, item.createdAt),
-      sequence: item.apiId * 2,
+      sequence: getDisposalActionSequence("ban", item.apiId, sequenceStep),
     })),
     ...unbans.map((item) => ({
       id: item.id,
@@ -258,7 +342,7 @@ function buildLatestActions(
       tone: "success" as const,
       targetPath: "/unbans",
       sortTime: getTimeMs(item.createdAtMs, item.createdAt),
-      sequence: item.apiId * 2 + 1,
+      sequence: getDisposalActionSequence("unban", item.apiId, sequenceStep),
     })),
     ...commitments.map((item) => ({
       id: item.id,
@@ -283,6 +367,7 @@ function buildNamespaceProfiles(
   commitments: CommitmentRecord[],
   bans: BanRecord[],
   unbans: UnbanRecord[],
+  latestDisposalStatusActions: Map<string, DisposalStatusAction>,
 ): NamespaceProfile[] {
   const namespaces = new Set<string>();
   violations.forEach((item) => namespaces.add(item.namespace));
@@ -333,7 +418,7 @@ function buildNamespaceProfiles(
     return {
       namespace,
       violated: namespaceViolations.length > 0,
-      banned: latestDisposalAction?.kind === "ban",
+      banned: latestDisposalStatusActions.get(namespace)?.kind === "ban",
       commitmentUploaded: Boolean(namespaceCommitment),
       lastActionAt,
       commitment: namespaceCommitment
@@ -363,6 +448,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [banRecords, setBanRecords] = useState<BanRecord[]>([]);
   const [unbanRecords, setUnbanRecords] = useState<UnbanRecord[]>([]);
   const [violations, setViolations] = useState<ViolationRecord[]>([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
@@ -392,6 +478,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setBanRecords(bans);
       setUnbanRecords(unbans);
       setViolations(violationList);
+      setNowMs(Date.now());
       if (loadErrors.length > 0) {
         setError(loadErrors.join("；"));
       }
@@ -406,15 +493,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void refreshAll();
   }, [refreshAll]);
 
-  const stats = useMemo(() => buildStats(violations, banRecords, unbanRecords), [banRecords, unbanRecords, violations]);
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const latestDisposalStatusActions = useMemo(
+    () => buildLatestDisposalStatusActionsByNamespace(banRecords, unbanRecords, nowMs),
+    [banRecords, nowMs, unbanRecords],
+  );
+  const stats = useMemo(
+    () => buildStats(violations, banRecords, unbanRecords, nowMs, latestDisposalStatusActions),
+    [banRecords, latestDisposalStatusActions, nowMs, unbanRecords, violations],
+  );
   const latestViolations = useMemo(() => buildLatestViolations(violations), [violations]);
   const latestActions = useMemo(
     () => buildLatestActions(banRecords, unbanRecords, commitmentRecords),
     [banRecords, commitmentRecords, unbanRecords],
   );
   const namespaceProfiles = useMemo(
-    () => buildNamespaceProfiles(violations, commitmentRecords, banRecords, unbanRecords),
-    [banRecords, commitmentRecords, unbanRecords, violations],
+    () => buildNamespaceProfiles(violations, commitmentRecords, banRecords, unbanRecords, latestDisposalStatusActions),
+    [banRecords, commitmentRecords, latestDisposalStatusActions, unbanRecords, violations],
   );
 
   const createConfigRecord = useCallback(

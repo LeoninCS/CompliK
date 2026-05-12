@@ -191,6 +191,7 @@ function toCommitmentRecord(item: CommitmentDto): CommitmentRecord {
 
 function toBanRecord(item: BanDto): BanRecord {
   const startAt = new Date(item.ban_start_time).getTime();
+  const endAt = item.ban_end_time ? new Date(item.ban_end_time).getTime() : undefined;
 
   return {
     id: `ban-${item.id}`,
@@ -202,6 +203,7 @@ function toBanRecord(item: BanDto): BanRecord {
     banStartTime: formatDateTime(item.ban_start_time),
     banStartTimeMs: startAt,
     banEndTime: item.ban_end_time ? formatDateTime(item.ban_end_time) : undefined,
+    banEndTimeMs: endAt,
     createdAt: formatDateTime(item.created_at),
     createdAtMs: new Date(item.created_at).getTime(),
     updatedAt: formatDateTime(item.updated_at),

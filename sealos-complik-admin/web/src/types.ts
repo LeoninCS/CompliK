@@ -113,6 +113,7 @@ export type BanRecord = {
   banStartTime: string;
   banStartTimeMs: number;
   banEndTime?: string;
+  banEndTimeMs?: number;
   createdAt: string;
   createdAtMs: number;
   updatedAt: string;
