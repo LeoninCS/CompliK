@@ -24,7 +24,6 @@ var (
 
 const (
 	defaultCommitmentObjectPrefix = "commitments"
-	maxCommitmentFileSizeBytes    = 10 << 20 // 10MB
 	pdfContentType                = "application/pdf"
 )
 
@@ -169,13 +168,6 @@ func (s *Service) UploadCommitment(
 
 	if !isPDFFile(fileHeader) {
 		return nil, ErrCommitmentInvalidFile
-	}
-
-	if fileHeader.Size <= 0 || fileHeader.Size > maxCommitmentFileSizeBytes {
-		return nil, fmt.Errorf(
-			"pdf size must be between 1 byte and %d bytes",
-			maxCommitmentFileSizeBytes,
-		)
 	}
 
 	file, err := fileHeader.Open()

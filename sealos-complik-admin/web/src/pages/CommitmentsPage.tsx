@@ -178,11 +178,19 @@ export function CommitmentsPage() {
           <Field label="PDF 文件">
             <Input
               accept=".pdf,application/pdf"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const selectedFile = event.target.files?.[0] ?? null;
+                setFile(selectedFile);
+                setFormError(null);
+              }}
               type="file"
             />
           </Field>
-          {file ? <div className="muted-text">已选择：{file.name}</div> : null}
+          {file ? (
+            <div className="muted-text">
+              已选择：{file.name}（{Math.max(1, Math.round(file.size / 1024))} KB）
+            </div>
+          ) : null}
           {formError ? <div className="muted-text" style={{ color: "#b42318" }}>{formError}</div> : null}
           <div className="button-row">
             <Button variant="primary" onClick={() => void handleCreateCommitment()}>
