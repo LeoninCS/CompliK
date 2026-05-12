@@ -16,6 +16,7 @@
 package eventbus
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -151,6 +152,22 @@ var _ = Describe("EventBus", func() {
 			Expect(func() {
 				eb.Publish("nonexistent-topic", event)
 			}).NotTo(Panic())
+		})
+
+		It("should not block or leak send goroutines when a subscriber buffer is full", func() {
+			eb := NewEventBus(1)
+			ch := eb.Subscribe("slow")
+
+			eb.Publish("slow", Event{Payload: "queued"})
+
+			before := runtime.NumGoroutine()
+			for i := range 1000 {
+				eb.Publish("slow", Event{Payload: i})
+			}
+
+			Expect(runtime.NumGoroutine()).To(BeNumerically("<=", before+2))
+			Expect(ch).To(Receive(Equal(Event{Payload: "queued"})))
+			Consistently(ch, 50*time.Millisecond).ShouldNot(Receive())
 		})
 
 		It("should handle complex payload types", func(done Done) {

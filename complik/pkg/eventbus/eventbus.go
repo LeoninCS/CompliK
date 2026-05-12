@@ -47,16 +47,17 @@ func NewEventBus(bufferSize int) *EventBus {
 	}
 }
 
-// Publish sends an event to all subscribers of the specified topic
+// Publish sends an event to all subscribers of the specified topic.
+// If a subscriber buffer is full, the event is dropped for that subscriber.
 func (eb *EventBus) Publish(topic string, event Event) {
 	eb.mu.RLock()
-	subscribers := eb.subscribers[topic]
-	eb.mu.RUnlock()
+	defer eb.mu.RUnlock()
 
-	for _, subscriber := range subscribers {
-		go func(sub chan Event) {
-			sub <- event
-		}(subscriber)
+	for _, subscriber := range eb.subscribers[topic] {
+		select {
+		case subscriber <- event:
+		default:
+		}
 	}
 }
 
