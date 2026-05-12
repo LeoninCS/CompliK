@@ -20,10 +20,6 @@ import { buildBanScreenshotPreviewURL } from "../lib/api";
 import { summarizeMarkdown } from "../lib/utils";
 import type { BanRecord } from "../types";
 
-const maxScreenshotCount = 6;
-const maxScreenshotSizeBytes = 10 * 1024 * 1024;
-const maxScreenshotTotalSizeBytes = maxScreenshotCount * maxScreenshotSizeBytes;
-
 export function BansPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -79,21 +75,8 @@ export function BansPage() {
       return;
     }
 
-    const oversizedFile = files.find((file) => file.size > maxScreenshotSizeBytes);
-    if (oversizedFile) {
-      setFormError(`截图 ${oversizedFile.name} 超过 10MB。`);
-      return;
-    }
-
-    const next = [...screenshots, ...files].slice(0, maxScreenshotCount);
-    const totalSize = next.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > maxScreenshotTotalSizeBytes) {
-      setFormError("截图总大小超过 60MB。");
-      return;
-    }
-
     setFormError(null);
-    setScreenshots(next);
+    setScreenshots((current) => [...current, ...files]);
   };
 
   const removeScreenshot = (target: File) => {
@@ -145,19 +128,6 @@ export function BansPage() {
       setFormError("namespace、描述、开始时间、操作人均为必填。");
       return;
     }
-    if (screenshots.length > maxScreenshotCount) {
-      setFormError("截图最多上传 6 张。");
-      return;
-    }
-    if (screenshots.some((file) => file.size > maxScreenshotSizeBytes)) {
-      setFormError("单张截图最大 10MB。");
-      return;
-    }
-    if (screenshots.reduce((sum, file) => sum + file.size, 0) > maxScreenshotTotalSizeBytes) {
-      setFormError("截图总大小超过 60MB。");
-      return;
-    }
-
     setSubmitting(true);
     setFormError(null);
     try {
@@ -386,7 +356,7 @@ export function BansPage() {
                   event.target.value = "";
                 }}
               />
-              <div className="muted-text">支持 PNG、JPG、WEBP、GIF，最多 6 张，单张最大 10MB。</div>
+              <div className="muted-text">支持 PNG、JPG、WEBP、GIF。文件选择和粘贴图片会合并到同一列表。</div>
               {screenshots.length > 0 ? (
                 <div className="upload-list">
                   {screenshots.map((file) => (
