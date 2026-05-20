@@ -2,6 +2,7 @@ package ban
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -84,9 +85,10 @@ func (r *Repository) HasActiveBan(
 ) (bool, error) {
 	action, err := r.getLatestBanStatusAction(ctx, namespace, now)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
+
 		return false, err
 	}
 

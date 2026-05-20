@@ -413,12 +413,14 @@ var _ = Describe("Processor", func() {
 			cgroupContent := `12:memory:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope
 11:cpu:/kubepods/besteffort/pod123/cri-containerd-aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd.scope`
 			cgroupPath := filepath.Join(pidDir, "cgroup")
-			err := os.WriteFile(cgroupPath, []byte(cgroupContent), 0644)
+			err := os.WriteFile(cgroupPath, []byte(cgroupContent), 0o600)
 			Expect(err).NotTo(HaveOccurred())
 
 			containerID := processor.getContainerIDFromPID(1234)
 
-			Expect(containerID).To(Equal("aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd"))
+			Expect(containerID).To(Equal(
+				"aabbccddee112233445566778899aabbccddee112233445566778899aabbccdd",
+			))
 			Expect(isHexString(containerID)).To(BeTrue())
 		})
 

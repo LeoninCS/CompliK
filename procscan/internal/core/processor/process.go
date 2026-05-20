@@ -307,6 +307,7 @@ func (p *Processor) getProcessName(cmdline string) string {
 // getContainerIDFromPID extracts container ID from process cgroup information
 func (p *Processor) getContainerIDFromPID(pid int) string {
 	cgroupPath := filepath.Join(p.ProcPath, strconv.Itoa(pid), "cgroup")
+
 	content, err := os.ReadFile(cgroupPath)
 	if err != nil {
 		return ""
