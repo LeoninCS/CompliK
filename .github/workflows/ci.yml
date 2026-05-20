@@ -14,14 +14,28 @@ on:
     paths-ignore:
       - "**/*.md"
 
+permissions:
+  contents: read
+
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint-and-test:
-    name: Lint and Test
+  go-test:
+    name: Go Test (${{ matrix.module }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: complik
+            path: complik
+          - module: procscan
+            path: procscan
+          - module: admin
+            path: sealos-complik-admin
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -29,33 +43,73 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.work"
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.sum
+            go.work.sum
+            complik/go.sum
+            procscan/go.sum
+            sealos-complik-admin/go.sum
 
-      - name: Go test (complik)
-        working-directory: complik
-        run: go test -v -timeout 30s -count=1 ./...
+      - name: Test
+        working-directory: ${{ matrix.path }}
+        run: go test -v -timeout 5m -count=1 ./...
 
-      - name: Go test (procscan)
-        working-directory: procscan
-        run: go test -v -timeout 30s -count=1 ./...
+  go-lint:
+    name: Go Lint (${{ matrix.module }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: complik
+            path: complik
+          - module: procscan
+            path: procscan
+          - module: admin
+            path: sealos-complik-admin
 
-      - name: Run Linter (complik)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.sum
+            go.work.sum
+            complik/go.sum
+            procscan/go.sum
+            sealos-complik-admin/go.sum
+
+      - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
-          working-directory: complik
+          version: v2.11.3
+          working-directory: ${{ matrix.path }}
           args: --color=always
 
-      - name: Run Linter (procscan)
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          working-directory: procscan
-          args: --color=always
+  admin-web-build:
+    name: Admin Web Build
+    runs-on: ubuntu-24.04
 
-      - name: Run Linter (admin)
-        uses: golangci/golangci-lint-action@v9
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
         with:
-          version: latest
-          working-directory: sealos-complik-admin
-          args: --color=always
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sealos-complik-admin/web/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: sealos-complik-admin/web
+        run: npm ci
+
+      - name: Build
+        working-directory: sealos-complik-admin/web
+        run: npm run build
