@@ -18,7 +18,7 @@ env:
   GHCR_COMPLIK: ghcr.io/${{ github.repository_owner }}/complik
   GHCR_PROCSCAN: ghcr.io/${{ github.repository_owner }}/procscan
   GHCR_ADMIN: ghcr.io/${{ github.repository_owner }}/sealos-complik-admin
-  GHCR_ADMIN_WEB: ghcr.io/${{ github.repository_owner }}/complik-admin-web
+  GHCR_ADMIN_WEB: ghcr.io/${{ github.repository_owner }}/sealos-complik-admin-web
   GHCR_CLUSTER: ghcr.io/${{ github.repository_owner }}/cluster
 
 jobs:
@@ -32,6 +32,7 @@ jobs:
     name: Build CompliK (${{ matrix.arch }})
     needs: ci
     permissions:
+      contents: read
       packages: write
     strategy:
       matrix:
@@ -106,6 +107,7 @@ jobs:
     name: Build ProcScan (${{ matrix.arch }})
     needs: ci
     permissions:
+      contents: read
       packages: write
     strategy:
       matrix:
@@ -162,113 +164,43 @@ jobs:
     name: Build Admin (${{ matrix.arch }})
     needs: ci
     permissions:
+      contents: read
       packages: write
     strategy:
       matrix:
         include:
           - arch: amd64
+            runs-on: ubuntu-24.04
           - arch: arm64
             runs-on: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Login to GitHub Container Registry
-        if: ${{ github.event_name != 'pull_request' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.GHCR_ADMIN }}
-
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: sealos-complik-admin
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/${{ matrix.arch }}
-          outputs: type=image,"name=${{ env.GHCR_ADMIN }}",name-canonical=true,push-by-digest=${{ github.event_name != 'pull_request' }},push=${{ github.event_name != 'pull_request' }}
-
-      - name: Export digest
-        run: |
-          mkdir -p ${{ runner.temp }}/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v6
-        with:
-          name: digests-admin-service-${{ matrix.arch }}
-          path: ${{ runner.temp }}/digests/*
-          if-no-files-found: error
-          retention-days: 1
+    uses: ./.github/workflows/build-image.yml
+    with:
+      context: sealos-complik-admin
+      image: ghcr.io/${{ github.repository_owner }}/sealos-complik-admin
+      artifact-name-prefix: digests-admin
+      arch: ${{ matrix.arch }}
+      runs-on: ${{ matrix.runs-on }}
 
   build-admin-web:
     name: Build Admin Web (${{ matrix.arch }})
     needs: ci
     permissions:
+      contents: read
       packages: write
     strategy:
       matrix:
         include:
           - arch: amd64
+            runs-on: ubuntu-24.04
           - arch: arm64
             runs-on: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Login to GitHub Container Registry
-        if: ${{ github.event_name != 'pull_request' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.GHCR_ADMIN_WEB }}
-
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: sealos-complik-admin/web
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/${{ matrix.arch }}
-          outputs: type=image,"name=${{ env.GHCR_ADMIN_WEB }}",name-canonical=true,push-by-digest=${{ github.event_name != 'pull_request' }},push=${{ github.event_name != 'pull_request' }}
-
-      - name: Export digest
-        run: |
-          mkdir -p ${{ runner.temp }}/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v6
-        with:
-          name: digests-admin-web-${{ matrix.arch }}
-          path: ${{ runner.temp }}/digests/*
-          if-no-files-found: error
-          retention-days: 1
+    uses: ./.github/workflows/build-image.yml
+    with:
+      context: sealos-complik-admin/web
+      image: ghcr.io/${{ github.repository_owner }}/sealos-complik-admin-web
+      artifact-name-prefix: digests-admin-web
+      arch: ${{ matrix.arch }}
+      runs-on: ${{ matrix.runs-on }}
 
   release-complik:
     name: Release CompliK Image
@@ -388,9 +320,14 @@ jobs:
       - name: Download digests
         uses: actions/download-artifact@v7
         with:
+          name: digests-admin-amd64
           path: ${{ runner.temp }}/digests
-          pattern: digests-admin-service-*
-          merge-multiple: true
+
+      - name: Download arm64 digest
+        uses: actions/download-artifact@v7
+        with:
+          name: digests-admin-arm64
+          path: ${{ runner.temp }}/digests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -473,6 +410,7 @@ jobs:
   release-sealos-image:
     name: Release Sealos Cluster Image
     permissions:
+      contents: read
       packages: write
     needs: [release-complik, release-procscan, release-admin, release-admin-web]
     runs-on: ubuntu-24.04
@@ -510,14 +448,18 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
+      - name: Install yq
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
       - name: Update image tags in Helm values
         working-directory: complik/deploy/deploy
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          VERSION="${{ steps.meta.outputs.version }}"
-          sed -i "s|repository: ghcr.io/your-org/complik|repository: ${{ env.GHCR_COMPLIK }}|g" charts/complik/values.yaml
-          sed -i "s|tag: \"latest\"|tag: \"${VERSION}\"|g" charts/complik/values.yaml
-          sed -i "s|repository: ghcr.io/your-org/procscan|repository: ${{ env.GHCR_PROCSCAN }}|g" charts/procscan/values.yaml
-          sed -i "s|tag: \"latest\"|tag: \"${VERSION}\"|g" charts/procscan/values.yaml
+          yq -i '.image.repository = strenv(GHCR_COMPLIK) | .image.tag = strenv(VERSION)' charts/complik/values.yaml
+          yq -i '.image.repository = strenv(GHCR_PROCSCAN) | .image.tag = strenv(VERSION)' charts/procscan/values.yaml
 
       - name: Login to GHCR with sealos
         run: |
