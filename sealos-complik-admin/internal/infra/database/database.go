@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	pingTimeout = 5 * time.Second
+	pingTimeout           = 5 * time.Second
+	maxDatabaseNameLength = 64
 )
 
 var client *gorm.DB
@@ -24,7 +25,7 @@ func Init(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return client, nil
 	}
 	// verify config before trying to connect to avoid unnecessary connection attempts with invalid config
-	if err := validateConfig(cfg); err != nil {
+	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
 	// Create database if it does not exist
@@ -57,10 +58,7 @@ func createDatabase(cfg config.DatabaseConfig) error {
 	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 	defer cancel()
 
-	query := fmt.Sprintf(
-		"CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci",
-		quoteIdentifier(cfg.Name),
-	)
+	query := createDatabaseQuery(cfg.Name)
 	if err := db.WithContext(ctx).Exec(query).Error; err != nil {
 		return fmt.Errorf("create database %q: %w", cfg.Name, err)
 	}
@@ -119,8 +117,8 @@ func serverDSN(cfg config.DatabaseConfig) string {
 	)
 }
 
-// validateConfig checks the minimum fields required to build a valid MySQL DSN.
-func validateConfig(cfg config.DatabaseConfig) error {
+// ValidateConfig checks the minimum fields required to build a valid MySQL DSN.
+func ValidateConfig(cfg config.DatabaseConfig) error {
 	if cfg.Host == "" {
 		return errors.New("database host is required")
 	}
@@ -137,7 +135,40 @@ func validateConfig(cfg config.DatabaseConfig) error {
 		return errors.New("database name is required")
 	}
 
+	if err := validateDatabaseName(cfg.Name); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func validateDatabaseName(name string) error {
+	if len(name) > maxDatabaseNameLength {
+		return fmt.Errorf("database name %q exceeds %d characters", name, maxDatabaseNameLength)
+	}
+
+	for _, r := range name {
+		if isDatabaseNameChar(r) {
+			continue
+		}
+
+		return fmt.Errorf("database name %q contains invalid character %q", name, r)
+	}
+
+	return nil
+}
+
+func isDatabaseNameChar(r rune) bool {
+	return r >= 'a' && r <= 'z' ||
+		r >= 'A' && r <= 'Z' ||
+		r >= '0' && r <= '9' ||
+		r == '_' ||
+		r == '-'
+}
+
+func createDatabaseQuery(name string) string {
+	return "CREATE DATABASE IF NOT EXISTS " + quoteIdentifier(name) +
+		" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 }
 
 func open(dsn string) (*gorm.DB, error) {
