@@ -25,7 +25,7 @@ func Init(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return client, nil
 	}
 	// verify config before trying to connect to avoid unnecessary connection attempts with invalid config
-	if err := validateConfig(cfg); err != nil {
+	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
 	// Create database if it does not exist
@@ -117,8 +117,8 @@ func serverDSN(cfg config.DatabaseConfig) string {
 	)
 }
 
-// validateConfig checks the minimum fields required to build a valid MySQL DSN.
-func validateConfig(cfg config.DatabaseConfig) error {
+// ValidateConfig checks the minimum fields required to build a valid MySQL DSN.
+func ValidateConfig(cfg config.DatabaseConfig) error {
 	if cfg.Host == "" {
 		return errors.New("database host is required")
 	}
@@ -167,7 +167,8 @@ func isDatabaseNameChar(r rune) bool {
 }
 
 func createDatabaseQuery(name string) string {
-	return "CREATE DATABASE IF NOT EXISTS " + quoteIdentifier(name) + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+	return "CREATE DATABASE IF NOT EXISTS " + quoteIdentifier(name) +
+		" CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 }
 
 func open(dsn string) (*gorm.DB, error) {

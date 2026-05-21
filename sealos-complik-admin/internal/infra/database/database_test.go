@@ -1,11 +1,14 @@
-package database
+package database_test
 
 import (
 	"strings"
 	"testing"
 
 	"sealos-complik-admin/internal/infra/config"
+	"sealos-complik-admin/internal/infra/database"
 )
+
+const maxDatabaseNameLength = 64
 
 func TestValidateConfigAcceptsDatabaseNames(t *testing.T) {
 	tests := []string{
@@ -55,4 +58,8 @@ func validDatabaseConfig() config.DatabaseConfig {
 		Username: "root",
 		Name:     "sealos-complik-admin",
 	}
+}
+
+func validateConfig(cfg config.DatabaseConfig) error {
+	return database.ValidateConfig(cfg)
 }
