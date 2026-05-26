@@ -74,6 +74,9 @@ plugins:
     enabled: true
     timeout: 100
     maxWorkers: 20
+    profiles:
+      - desktop
+      - mobile
 
   safety:
     enabled: true

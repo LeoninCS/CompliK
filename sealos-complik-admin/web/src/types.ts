@@ -40,6 +40,8 @@ export type ViolationRecord = {
   resourceName?: string;
   host?: string;
   url?: string;
+  deviceProfile?: string;
+  viewport?: string;
   keywords?: string[];
   processName?: string;
   processCommand?: string;

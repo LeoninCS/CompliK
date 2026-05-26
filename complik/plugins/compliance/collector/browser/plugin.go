@@ -61,10 +61,11 @@ func (p *BrowserPlugin) Type() string {
 }
 
 type BrowserConfig struct {
-	CollectorTimeoutSecond int `json:"timeout"`
-	MaxWorkers             int `json:"maxWorkers"`
-	BrowserNumber          int `json:"browserNumber"`
-	BrowserTimeoutMinute   int `json:"browserTimeout"`
+	CollectorTimeoutSecond int      `json:"timeout"`
+	MaxWorkers             int      `json:"maxWorkers"`
+	BrowserNumber          int      `json:"browserNumber"`
+	BrowserTimeoutMinute   int      `json:"browserTimeout"`
+	Profiles               []string `json:"profiles"`
 }
 
 func (p *BrowserPlugin) getDefaultBrowserConfig() BrowserConfig {
@@ -73,6 +74,7 @@ func (p *BrowserPlugin) getDefaultBrowserConfig() BrowserConfig {
 		MaxWorkers:             20,
 		BrowserNumber:          20,
 		BrowserTimeoutMinute:   300,
+		Profiles:               DefaultDeviceProfiles(),
 	}
 }
 
@@ -109,7 +111,40 @@ func (p *BrowserPlugin) loadConfig(setting string) error {
 		p.browserConfig.BrowserTimeoutMinute = configFromJSON.BrowserTimeoutMinute
 	}
 
+	if len(configFromJSON.Profiles) > 0 {
+		p.browserConfig.Profiles = p.normalizeDeviceProfiles(configFromJSON.Profiles)
+	}
+
 	return nil
+}
+
+func (p *BrowserPlugin) normalizeDeviceProfiles(profiles []string) []string {
+	seen := make(map[string]struct{}, len(profiles))
+	normalized := make([]string, 0, len(profiles))
+
+	for _, name := range profiles {
+		profile, ok := ResolveDeviceProfile(name)
+		if !ok {
+			p.log.Warn("Skip unknown browser device profile", logger.Fields{
+				"profile": name,
+			})
+
+			continue
+		}
+
+		if _, exists := seen[profile.Name]; exists {
+			continue
+		}
+
+		seen[profile.Name] = struct{}{}
+		normalized = append(normalized, profile.Name)
+	}
+
+	if len(normalized) == 0 {
+		return DefaultDeviceProfiles()
+	}
+
+	return normalized
 }
 
 func (p *BrowserPlugin) Start(
@@ -126,6 +161,7 @@ func (p *BrowserPlugin) Start(
 		"timeout_seconds":   p.browserConfig.CollectorTimeoutSecond,
 		"max_workers":       p.browserConfig.MaxWorkers,
 		"browser_pool_size": p.browserConfig.BrowserNumber,
+		"profiles":          p.browserConfig.Profiles,
 	})
 
 	p.browserPool = utils.NewBrowserPool(
@@ -166,67 +202,84 @@ func (p *BrowserPlugin) Start(
 					return
 				}
 
-				var result *models.CollectorInfo
-
-				taskCtx, cancel := context.WithTimeout(
-					ctx,
-					time.Duration(p.browserConfig.CollectorTimeoutSecond)*time.Second,
-				)
-				taskCtx = context.WithValue(taskCtx, startTimeContextKey, time.Now())
-
-				defer cancel()
-
 				p.log.Debug("Processing discovery", logger.Fields{
 					"namespace": ingress.Namespace,
 					"name":      ingress.Name,
 					"host":      ingress.Host,
+					"path":      ingress.Path,
 				})
 
-				result, err := p.collector.CollectorAndScreenshot(
-					taskCtx,
-					ingress,
-					p.browserPool,
-					p.Name(),
-					time.Duration(p.browserConfig.CollectorTimeoutSecond)*time.Second,
-				)
-				if err != nil {
-					if p.shouldSkipError(err) {
-						result = &models.CollectorInfo{
-							DiscoveryName:    ingress.DiscoveryName,
-							CollectorName:    p.Name(),
-							Name:             ingress.Name,
-							Namespace:        ingress.Namespace,
-							Host:             ingress.Host,
-							Path:             ingress.Path,
-							URL:              "",
-							HTML:             "",
-							Screenshot:       nil,
-							IsEmpty:          true,
-							CollectorMessage: err.Error(),
-						}
-						eventBus.Publish(constants.CollectorTopic, eventbus.Event{
-							Payload: result,
-						})
-						p.log.Debug("Skipped known error", logger.Fields{
-							"host":  ingress.Host,
-							"error": err.Error(),
-						})
-					} else {
-						p.log.Error("Collection failed", logger.Fields{
-							"host":      ingress.Host,
-							"namespace": ingress.Namespace,
-							"name":      ingress.Name,
-							"error":     err.Error(),
-						})
+				for _, profileName := range p.browserConfig.Profiles {
+					profile, ok := ResolveDeviceProfile(profileName)
+					if !ok {
+						continue
 					}
-				} else {
+
+					taskCtx, cancel := context.WithTimeout(
+						ctx,
+						time.Duration(p.browserConfig.CollectorTimeoutSecond)*time.Second,
+					)
+					taskCtx = context.WithValue(taskCtx, startTimeContextKey, time.Now())
+
+					result, err := p.collector.CollectorAndScreenshot(
+						taskCtx,
+						ingress,
+						p.browserPool,
+						p.Name(),
+						time.Duration(p.browserConfig.CollectorTimeoutSecond)*time.Second,
+						profile,
+					)
+
+					cancel()
+
+					if err != nil {
+						if p.shouldSkipError(err) {
+							result = &models.CollectorInfo{
+								DiscoveryName:    ingress.DiscoveryName,
+								CollectorName:    p.Name(),
+								Name:             ingress.Name,
+								Namespace:        ingress.Namespace,
+								Host:             ingress.Host,
+								Path:             ingress.Path,
+								URL:              "",
+								DeviceProfile:    profile.Name,
+								Viewport:         profile.Viewport(),
+								HTML:             "",
+								Screenshot:       nil,
+								IsEmpty:          true,
+								CollectorMessage: err.Error(),
+							}
+							eventBus.Publish(constants.CollectorTopic, eventbus.Event{
+								Payload: result,
+							})
+							p.log.Debug("Skipped known error", logger.Fields{
+								"host":           ingress.Host,
+								"device_profile": profile.Name,
+								"error":          err.Error(),
+							})
+
+							continue
+						}
+
+						p.log.Error("Collection failed", logger.Fields{
+							"host":           ingress.Host,
+							"namespace":      ingress.Namespace,
+							"name":           ingress.Name,
+							"device_profile": profile.Name,
+							"error":          err.Error(),
+						})
+
+						continue
+					}
+
 					eventBus.Publish(constants.CollectorTopic, eventbus.Event{
 						Payload: result,
 					})
 					p.log.Debug("Collection successful", logger.Fields{
-						"host":      ingress.Host,
-						"namespace": ingress.Namespace,
-						"name":      ingress.Name,
+						"host":           ingress.Host,
+						"namespace":      ingress.Namespace,
+						"name":           ingress.Name,
+						"device_profile": profile.Name,
 					})
 				}
 			}(event)

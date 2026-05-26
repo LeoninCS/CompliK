@@ -25,6 +25,9 @@ type CollectorInfo struct {
 	Path []string `json:"path"`
 	URL  string   `json:"url"`
 
+	DeviceProfile string `json:"device_profile"`
+	Viewport      string `json:"viewport"`
+
 	CollectorMessage string `json:"collector_message"`
 
 	HTML       string `json:"html"`

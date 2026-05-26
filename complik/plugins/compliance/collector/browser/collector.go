@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -35,6 +36,49 @@ type contextKey string
 
 const startTimeContextKey contextKey = "start_time"
 
+const (
+	DeviceProfileDesktop = "desktop"
+	DeviceProfileMobile  = "mobile"
+)
+
+type DeviceProfile struct {
+	Name              string
+	UserAgent         string
+	Width             int
+	Height            int
+	DeviceScaleFactor float64
+	Mobile            bool
+}
+
+func DefaultDeviceProfiles() []string {
+	return []string{DeviceProfileDesktop, DeviceProfileMobile}
+}
+
+func ResolveDeviceProfile(name string) (DeviceProfile, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", DeviceProfileDesktop:
+		return DeviceProfile{
+			Name:              DeviceProfileDesktop,
+			UserAgent:         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+			Width:             1366,
+			Height:            768,
+			DeviceScaleFactor: 1,
+			Mobile:            false,
+		}, true
+	case DeviceProfileMobile:
+		return DeviceProfile{
+			Name:              DeviceProfileMobile,
+			UserAgent:         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+			Width:             390,
+			Height:            844,
+			DeviceScaleFactor: 3,
+			Mobile:            true,
+		}, true
+	default:
+		return DeviceProfile{}, false
+	}
+}
+
 type CollectorInfo struct {
 	DiscoveryName string `json:"discovery_name"`
 	CollectorName string `json:"collector_name"`
@@ -45,6 +89,9 @@ type CollectorInfo struct {
 	Host string   `json:"host"`
 	Path []string `json:"path"`
 	URL  string   `json:"url"`
+
+	DeviceProfile string `json:"device_profile"`
+	Viewport      string `json:"viewport"`
 
 	HTML       string `json:"html"`
 	IsEmpty    bool   `json:"is_empty"`
@@ -67,9 +114,12 @@ func (s *Collector) CollectorAndScreenshot(
 	browserPool *utils.BrowserPool,
 	name string,
 	duration time.Duration,
+	profile DeviceProfile,
 ) (*models.CollectorInfo, error) {
 	taskCtx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
+
+	viewport := profile.Viewport()
 
 	if discovery.PodCount == 0 {
 		return &models.CollectorInfo{
@@ -80,6 +130,8 @@ func (s *Collector) CollectorAndScreenshot(
 			Host:          discovery.Host,
 			Path:          discovery.Path,
 			URL:           "",
+			DeviceProfile: profile.Name,
+			Viewport:      viewport,
 			HTML:          "",
 			Screenshot:    nil,
 			IsEmpty:       true,
@@ -92,7 +144,7 @@ func (s *Collector) CollectorAndScreenshot(
 	}
 	defer browserPool.Put(instance)
 
-	page, err := s.setupPage(taskCtx, instance)
+	page, err := s.setupPage(taskCtx, instance, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +192,8 @@ func (s *Collector) CollectorAndScreenshot(
 					Host:          discovery.Host,
 					Path:          discovery.Path,
 					URL:           "",
+					DeviceProfile: profile.Name,
+					Viewport:      viewport,
 					HTML:          "",
 					Screenshot:    nil,
 					IsEmpty:       true,
@@ -177,6 +231,8 @@ func (s *Collector) CollectorAndScreenshot(
 			Host:          discovery.Host,
 			Path:          discovery.Path,
 			URL:           "",
+			DeviceProfile: profile.Name,
+			Viewport:      viewport,
 			HTML:          "",
 			Screenshot:    nil,
 			IsEmpty:       true,
@@ -200,6 +256,8 @@ func (s *Collector) CollectorAndScreenshot(
 		"screenshot_size": len(screenshot),
 		"namespace":       discovery.Namespace,
 		"name":            discovery.Name,
+		"device_profile":  profile.Name,
+		"viewport":        viewport,
 		"duration_ms":     duration,
 	})
 
@@ -211,6 +269,8 @@ func (s *Collector) CollectorAndScreenshot(
 		Host:          discovery.Host,
 		Path:          discovery.Path,
 		URL:           url,
+		DeviceProfile: profile.Name,
+		Viewport:      viewport,
 		HTML:          content,
 		Screenshot:    screenshot,
 		IsEmpty:       false,
@@ -224,15 +284,16 @@ func (s *Collector) formatURL(ingress models.DiscoveryInfo) string {
 	}
 
 	if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
-		return host
+		return joinURLPath(host, ingress.Path)
 	}
 
-	return "http://" + host
+	return joinURLPath("http://"+host, ingress.Path)
 }
 
 func (s *Collector) setupPage(
 	ctx context.Context,
 	instance *utils.BrowserInstance,
+	profile DeviceProfile,
 ) (*rod.Page, error) {
 	var page *rod.Page
 
@@ -252,7 +313,7 @@ func (s *Collector) setupPage(
 	}
 
 	err = page.SetUserAgent(&proto.NetworkSetUserAgentOverride{
-		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+		UserAgent: profile.UserAgent,
 	})
 	if err != nil {
 		s.log.Error("Failed to set user agent", logger.Fields{
@@ -262,22 +323,48 @@ func (s *Collector) setupPage(
 	}
 
 	err = page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
-		Width:             1366,
-		Height:            768,
-		DeviceScaleFactor: 1,
-		Mobile:            false,
+		Width:             profile.Width,
+		Height:            profile.Height,
+		DeviceScaleFactor: profile.DeviceScaleFactor,
+		Mobile:            profile.Mobile,
 	})
 	if err != nil {
 		s.log.Error("Failed to set viewport", logger.Fields{
 			"error":  err.Error(),
-			"width":  1366,
-			"height": 768,
+			"width":  profile.Width,
+			"height": profile.Height,
 		})
 
 		return nil, err
 	}
 
 	return page, nil
+}
+
+func (p DeviceProfile) Viewport() string {
+	return fmt.Sprintf("%dx%d@%.2f", p.Width, p.Height, p.DeviceScaleFactor)
+}
+
+func joinURLPath(baseURL string, paths []string) string {
+	if len(paths) == 0 || strings.TrimSpace(paths[0]) == "" || strings.TrimSpace(paths[0]) == "/" {
+		return baseURL
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return strings.TrimRight(baseURL, "/") +
+			"/" +
+			strings.TrimLeft(strings.TrimSpace(paths[0]), "/")
+	}
+
+	pathValue := strings.TrimSpace(paths[0])
+	if strings.HasPrefix(pathValue, "/") {
+		parsed.Path = pathValue
+	} else {
+		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + pathValue
+	}
+
+	return parsed.String()
 }
 
 func (s *Collector) waitForPageLoad(ctx context.Context, page *rod.Page) error {

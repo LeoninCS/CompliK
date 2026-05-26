@@ -72,6 +72,8 @@ type complikViolationRequest struct {
 	Host          string    `json:"host,omitempty"`
 	URL           string    `json:"url,omitempty"`
 	Path          []string  `json:"path,omitempty"`
+	DeviceProfile string    `json:"device_profile,omitempty"`
+	Viewport      string    `json:"viewport,omitempty"`
 	Keywords      []string  `json:"keywords,omitempty"`
 	Description   string    `json:"description,omitempty"`
 	Explanation   string    `json:"explanation,omitempty"`
@@ -237,6 +239,8 @@ func (p *AdminReporterPlugin) reportViolation(
 		Host:          result.Host,
 		URL:           result.URL,
 		Path:          result.Path,
+		DeviceProfile: result.DeviceProfile,
+		Viewport:      result.Viewport,
 		Keywords:      result.Keywords,
 		Description:   result.Description,
 		Explanation:   result.Explanation,
@@ -289,7 +293,9 @@ func buildComplikRawPayload(result *models.DetectorInfo) map[string]any {
 			"地域":    result.Region,
 			"主机":    result.Host,
 			"路径":    result.Path,
-			"完整URL": result.URL,
+			"完整URL": formatURLForRawPayload(result.URL),
+			"设备端":   result.DeviceProfile,
+			"视口":    result.Viewport,
 			"描述":    result.Description,
 			"匹配关键词": result.Keywords,
 			"是否违规":  result.IsIllegal,
@@ -297,6 +303,15 @@ func buildComplikRawPayload(result *models.DetectorInfo) map[string]any {
 		},
 		"上报来源": "complik",
 	}
+}
+
+func formatURLForRawPayload(rawURL string) string {
+	url := strings.TrimSpace(rawURL)
+	if url == "" {
+		return "-"
+	}
+
+	return url
 }
 
 func postJSON(ctx context.Context, endpoint string, payload any, auth config.AdminBasicAuth) error {

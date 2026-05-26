@@ -494,6 +494,8 @@ func (r *ContentReviewer) parseResponse(
 		Host:          content.Host,
 		Path:          content.Path,
 		URL:           content.URL,
+		DeviceProfile: content.DeviceProfile,
+		Viewport:      content.Viewport,
 		IsIllegal:     isIllegal,
 		Description:   result.Description,
 		Keywords:      keywords,

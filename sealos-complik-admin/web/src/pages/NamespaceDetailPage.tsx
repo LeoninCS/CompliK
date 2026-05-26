@@ -15,7 +15,7 @@ import {
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { useAppData } from "../contexts/AppDataContext";
 import { buildCommitmentDownloadURL } from "../lib/api";
-import { formatViolationTypeLabel, summarizeMarkdown } from "../lib/utils";
+import { formatURLWithDeviceProfile, formatViolationTypeLabel, summarizeMarkdown } from "../lib/utils";
 import type { ViolationRecord } from "../types";
 
 function toneByBoolean(value: boolean, positiveTone: "success" | "warn" | "danger" = "success") {
@@ -279,7 +279,13 @@ export function NamespaceDetailPage() {
                 { label: "detector / process", value: selectedViolation.detectorName ?? selectedViolation.processName ?? "-" },
                 { label: "资源 / pod", value: selectedViolation.resourceName ?? selectedViolation.podName ?? "-" },
                 { label: "host / node", value: selectedViolation.host ?? selectedViolation.nodeName ?? "-" },
-                { label: "URL / message", value: selectedViolation.url ?? selectedViolation.message ?? "-" },
+                {
+                  label: "URL / message",
+                  value:
+                    selectedViolation.type === "complik"
+                      ? formatURLWithDeviceProfile(selectedViolation.url, selectedViolation.deviceProfile)
+                      : (selectedViolation.message ?? "-"),
+                },
               ]}
             />
             <div className="ban-detail-section">

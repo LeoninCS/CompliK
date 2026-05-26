@@ -56,6 +56,20 @@ export function formatViolationTypeLabel(value: "complik" | "procscan") {
   return value === "complik" ? "内容违规" : "进程违规";
 }
 
+export function formatURLWithDeviceProfile(url: string | null | undefined, deviceProfile: string | null | undefined) {
+  const trimmedURL = url?.trim() ?? "";
+  if (!trimmedURL) {
+    return "-";
+  }
+
+  const trimmedProfile = deviceProfile?.trim() ?? "";
+  if (!trimmedProfile) {
+    return trimmedURL;
+  }
+
+  return `${trimmedURL}（${trimmedProfile}）`;
+}
+
 export function summarizeMarkdown(value: string, maxLength = 80) {
   const collapsed = value
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1 ")
