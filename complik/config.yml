@@ -48,7 +48,8 @@ plugins:
     settings: |
       {
         "timeout": 100,
-        "maxWorkers": 20
+        "maxWorkers": 20,
+        "profiles": ["desktop", "mobile"]
       }
 
   - name: "Safety"

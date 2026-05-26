@@ -38,6 +38,9 @@ type DetectorInfo struct {
 	Path []string `json:"path"`
 	URL  string   `json:"url"`
 
+	DeviceProfile string `json:"device_profile,omitempty"`
+	Viewport      string `json:"viewport,omitempty"`
+
 	Description string   `json:"description,omitempty"`
 	Keywords    []string `json:"keywords,omitempty"`
 

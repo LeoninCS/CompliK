@@ -52,7 +52,8 @@ data:
         settings: |
           {
             "timeout": {{ .Values.plugins.browser.timeout }},
-            "maxWorkers": {{ .Values.plugins.browser.maxWorkers }}
+            "maxWorkers": {{ .Values.plugins.browser.maxWorkers }},
+            "profiles": {{ .Values.plugins.browser.profiles | toJson }}
           }
       - name: "Safety"
         type: "Compliance"
