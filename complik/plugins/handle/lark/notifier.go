@@ -111,6 +111,26 @@ func (f *Notifier) buildAlertMessage(results *models.DetectorInfo) map[string]an
 		},
 	}
 
+	if results.DeviceProfile != "" {
+		basicInfoElements = append(basicInfoElements, map[string]any{
+			"tag": "div",
+			"text": map[string]any{
+				"content": "**设备端:** " + results.DeviceProfile,
+				"tag":     "lark_md",
+			},
+		})
+	}
+
+	if results.Viewport != "" {
+		basicInfoElements = append(basicInfoElements, map[string]any{
+			"tag": "div",
+			"text": map[string]any{
+				"content": "**视口:** " + results.Viewport,
+				"tag":     "lark_md",
+			},
+		})
+	}
+
 	if len(results.Path) > 0 {
 		var pathContent strings.Builder
 		pathContent.WriteString("**检测路径:**\n")

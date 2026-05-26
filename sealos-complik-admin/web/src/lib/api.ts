@@ -61,6 +61,8 @@ type ComplikViolationDto = {
   resource_name?: string;
   host?: string;
   url?: string;
+  device_profile?: string;
+  viewport?: string;
   keywords?: string[];
   description?: string;
   is_illegal?: boolean;
@@ -232,6 +234,8 @@ function toComplikViolationRecord(item: ComplikViolationDto): ViolationRecord {
     resourceName: item.resource_name,
     host: item.host,
     url: item.url,
+    deviceProfile: item.device_profile,
+    viewport: item.viewport,
     keywords: item.keywords ?? [],
     detectedAt: formatDateTime(item.detected_at),
     detectedAtMs: new Date(item.detected_at).getTime(),

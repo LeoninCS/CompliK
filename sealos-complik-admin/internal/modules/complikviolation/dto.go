@@ -23,6 +23,8 @@ type CreateViolationRequest struct {
 	Host          string          `json:"host"           binding:"omitempty,max=255"`
 	URL           string          `json:"url"            binding:"omitempty,max=1024"`
 	Path          []string        `json:"path"`
+	DeviceProfile string          `json:"device_profile" binding:"omitempty,max=32"`
+	Viewport      string          `json:"viewport"       binding:"omitempty,max=64"`
 	Keywords      []string        `json:"keywords"`
 	Description   string          `json:"description"    binding:"omitempty"`
 	Explanation   string          `json:"explanation"    binding:"omitempty"`
@@ -43,6 +45,8 @@ type ViolationResponse struct {
 	Host          string          `json:"host,omitempty"`
 	URL           string          `json:"url,omitempty"`
 	Path          []string        `json:"path,omitempty"`
+	DeviceProfile string          `json:"device_profile,omitempty"`
+	Viewport      string          `json:"viewport,omitempty"`
 	Keywords      []string        `json:"keywords,omitempty"`
 	Description   string          `json:"description,omitempty"`
 	Explanation   string          `json:"explanation,omitempty"`

@@ -22,6 +22,11 @@ function toneByBoolean(value: boolean, positiveTone: "success" | "warn" | "dange
   return value ? positiveTone : "neutral";
 }
 
+function formatViolationUrlWithDeviceProfile(item: ViolationRecord) {
+  const url = item.url ?? "-";
+  return item.deviceProfile ? `${url}（${item.deviceProfile}）` : url;
+}
+
 export function NamespaceDetailPage() {
   const { namespace } = useParams();
   const navigate = useNavigate();
@@ -279,7 +284,13 @@ export function NamespaceDetailPage() {
                 { label: "detector / process", value: selectedViolation.detectorName ?? selectedViolation.processName ?? "-" },
                 { label: "资源 / pod", value: selectedViolation.resourceName ?? selectedViolation.podName ?? "-" },
                 { label: "host / node", value: selectedViolation.host ?? selectedViolation.nodeName ?? "-" },
-                { label: "URL / message", value: selectedViolation.url ?? selectedViolation.message ?? "-" },
+                {
+                  label: "URL / message",
+                  value:
+                    selectedViolation.type === "complik"
+                      ? formatViolationUrlWithDeviceProfile(selectedViolation)
+                      : (selectedViolation.message ?? "-"),
+                },
               ]}
             />
             <div className="ban-detail-section">

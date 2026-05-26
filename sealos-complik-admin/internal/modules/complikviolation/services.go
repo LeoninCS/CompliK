@@ -56,6 +56,8 @@ func (s *Service) CreateViolation(ctx context.Context, req CreateViolationReques
 		Host:          input.Host,
 		URL:           input.URL,
 		Path:          pathJSON,
+		DeviceProfile: input.DeviceProfile,
+		Viewport:      input.Viewport,
 		Keywords:      keywordsJSON,
 		Description:   input.Description,
 		Explanation:   input.Explanation,
@@ -178,6 +180,8 @@ type normalizedViolationInput struct {
 	Host          string
 	URL           string
 	Path          []string
+	DeviceProfile string
+	Viewport      string
 	Keywords      []string
 	Description   string
 	Explanation   string
@@ -214,6 +218,8 @@ func normalizeViolationInput(req CreateViolationRequest) (*normalizedViolationIn
 		Host:          strings.TrimSpace(req.Host),
 		URL:           strings.TrimSpace(req.URL),
 		Path:          req.Path,
+		DeviceProfile: strings.TrimSpace(req.DeviceProfile),
+		Viewport:      strings.TrimSpace(req.Viewport),
 		Keywords:      req.Keywords,
 		Description:   strings.TrimSpace(req.Description),
 		Explanation:   strings.TrimSpace(req.Explanation),
@@ -352,6 +358,8 @@ func toViolationResponse(violation *ComplikViolationEvent) *ViolationResponse {
 		Host:          violation.Host,
 		URL:           violation.URL,
 		Path:          parseStringSlice(violation.Path),
+		DeviceProfile: violation.DeviceProfile,
+		Viewport:      violation.Viewport,
 		Keywords:      parseStringSlice(violation.Keywords),
 		Description:   violation.Description,
 		Explanation:   violation.Explanation,
