@@ -229,7 +229,9 @@ func (p *BrowserPlugin) Start(
 						time.Duration(p.browserConfig.CollectorTimeoutSecond)*time.Second,
 						profile,
 					)
+
 					cancel()
+
 					if err != nil {
 						if p.shouldSkipError(err) {
 							result = &models.CollectorInfo{

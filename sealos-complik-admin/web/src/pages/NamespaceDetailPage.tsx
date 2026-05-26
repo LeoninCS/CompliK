@@ -15,16 +15,11 @@ import {
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { useAppData } from "../contexts/AppDataContext";
 import { buildCommitmentDownloadURL } from "../lib/api";
-import { formatViolationTypeLabel, summarizeMarkdown } from "../lib/utils";
+import { formatURLWithDeviceProfile, formatViolationTypeLabel, summarizeMarkdown } from "../lib/utils";
 import type { ViolationRecord } from "../types";
 
 function toneByBoolean(value: boolean, positiveTone: "success" | "warn" | "danger" = "success") {
   return value ? positiveTone : "neutral";
-}
-
-function formatViolationUrlWithDeviceProfile(item: ViolationRecord) {
-  const url = item.url ?? "-";
-  return item.deviceProfile ? `${url}（${item.deviceProfile}）` : url;
 }
 
 export function NamespaceDetailPage() {
@@ -288,7 +283,7 @@ export function NamespaceDetailPage() {
                   label: "URL / message",
                   value:
                     selectedViolation.type === "complik"
-                      ? formatViolationUrlWithDeviceProfile(selectedViolation)
+                      ? formatURLWithDeviceProfile(selectedViolation.url, selectedViolation.deviceProfile)
                       : (selectedViolation.message ?? "-"),
                 },
               ]}

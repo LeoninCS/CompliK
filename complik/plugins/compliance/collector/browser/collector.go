@@ -352,7 +352,9 @@ func joinURLPath(baseURL string, paths []string) string {
 
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
-		return strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(strings.TrimSpace(paths[0]), "/")
+		return strings.TrimRight(baseURL, "/") +
+			"/" +
+			strings.TrimLeft(strings.TrimSpace(paths[0]), "/")
 	}
 
 	pathValue := strings.TrimSpace(paths[0])

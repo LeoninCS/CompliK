@@ -293,7 +293,8 @@ func buildComplikRawPayload(result *models.DetectorInfo) map[string]any {
 			"地域":    result.Region,
 			"主机":    result.Host,
 			"路径":    result.Path,
-			"完整URL": formatURLWithDeviceProfile(result.URL, result.DeviceProfile),
+			"完整URL": formatURLForRawPayload(result.URL),
+			"设备端":   result.DeviceProfile,
 			"视口":    result.Viewport,
 			"描述":    result.Description,
 			"匹配关键词": result.Keywords,
@@ -304,18 +305,13 @@ func buildComplikRawPayload(result *models.DetectorInfo) map[string]any {
 	}
 }
 
-func formatURLWithDeviceProfile(rawURL, deviceProfile string) string {
+func formatURLForRawPayload(rawURL string) string {
 	url := strings.TrimSpace(rawURL)
 	if url == "" {
-		url = "-"
+		return "-"
 	}
 
-	profile := strings.TrimSpace(deviceProfile)
-	if profile == "" {
-		return url
-	}
-
-	return fmt.Sprintf("%s（%s）", url, profile)
+	return url
 }
 
 func postJSON(ctx context.Context, endpoint string, payload any, auth config.AdminBasicAuth) error {

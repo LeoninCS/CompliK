@@ -15,13 +15,8 @@ import {
 } from "../components/ui";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { useAppData } from "../contexts/AppDataContext";
-import { formatViolationTypeLabel } from "../lib/utils";
+import { formatURLWithDeviceProfile, formatViolationTypeLabel } from "../lib/utils";
 import type { ViolationRecord, ViolationType } from "../types";
-
-function formatUrlWithDeviceProfile(item: ViolationRecord) {
-  const url = item.url ?? "-";
-  return item.deviceProfile ? `${url}（${item.deviceProfile}）` : url;
-}
 
 export function ViolationsPage() {
   const navigate = useNavigate();
@@ -138,7 +133,7 @@ export function ViolationsPage() {
                   </td>
                   <td>
                     {tab === "complik" ? (
-                      <div>{formatUrlWithDeviceProfile(item)}</div>
+                      <div>{formatURLWithDeviceProfile(item.url, item.deviceProfile)}</div>
                     ) : (
                       <>
                         <div>{item.nodeName ?? "-"}</div>
@@ -181,7 +176,10 @@ export function ViolationsPage() {
                 { label: "detector / process", value: selected.detectorName ?? selected.processName ?? "-" },
                 { label: "资源 / pod", value: selected.resourceName ?? selected.podName ?? "-" },
                 { label: "host / node", value: selected.host ?? selected.nodeName ?? "-" },
-                { label: "URL / message", value: selected.type === "complik" ? formatUrlWithDeviceProfile(selected) : (selected.message ?? "-") },
+                {
+                  label: "URL / message",
+                  value: selected.type === "complik" ? formatURLWithDeviceProfile(selected.url, selected.deviceProfile) : (selected.message ?? "-"),
+                },
                 { label: "视口", value: selected.viewport ?? "-" },
                 { label: "关键词", value: selected.keywords?.join(", ") ?? "-" },
                 { label: "发现时间", value: selected.detectedAt },
