@@ -201,16 +201,21 @@ func (p *Processor) AnalyzeProcess(pid int) (*models.ProcessInfo, error) {
 	// Step 5: Query container info on-demand when container metadata is available.
 	var podName, namespace string
 	if containerID == "" {
-		procLogger.Debug(
-			"Unable to determine container ID, continue alerting without container metadata",
-		)
+		procLogger.WithFields(logrus.Fields{
+			"container_metadata_degraded": true,
+			"container_metadata_reason":   "container_id_missing",
+			"main_process_pid":            mainProcessPID,
+		}).Warn("Unable to determine container ID, continue alerting without container metadata")
 	} else {
 		podName, namespace, err = container.GetContainerInfo(containerID)
 		if err != nil {
 			procLogger.WithFields(logrus.Fields{
-				"containerID": containerID,
-				"error":       err.Error(),
-			}).Debug("Failed to get container info, continue alerting without pod/namespace")
+				"containerID":                 containerID,
+				"container_metadata_degraded": true,
+				"container_metadata_reason":   "cri_container_info_failed",
+				"container_metadata_error":    err.Error(),
+				"main_process_pid":            mainProcessPID,
+			}).Warn("Failed to get container info, continue alerting without pod/namespace")
 
 			podName = ""
 			namespace = ""
