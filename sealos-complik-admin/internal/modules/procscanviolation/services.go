@@ -145,10 +145,6 @@ func (s *Service) ListViolationsPage(
 
 	responses := make([]ViolationResponse, 0, len(violations))
 	for i := range violations {
-		if !options.IncludeAll && !isEffectiveViolation(&violations[i]) {
-			continue
-		}
-
 		responses = append(responses, *toViolationResponse(&violations[i]))
 	}
 
