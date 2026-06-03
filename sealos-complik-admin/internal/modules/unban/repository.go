@@ -59,12 +59,14 @@ func (r *Repository) ListUnbansPage(
 	operatorName string,
 ) ([]Unban, int64, error) {
 	var total int64
+
 	countQuery := r.buildListQuery(ctx, keyword, operatorName)
 	if err := countQuery.Model(&Unban{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var unbans []Unban
+
 	query := r.buildListQuery(ctx, keyword, operatorName)
 	if err := query.
 		Order("created_at DESC, id DESC").
@@ -77,12 +79,17 @@ func (r *Repository) ListUnbansPage(
 	return unbans, total, nil
 }
 
-func (r *Repository) buildListQuery(ctx context.Context, keyword string, operatorName string) *gorm.DB {
+func (r *Repository) buildListQuery(
+	ctx context.Context,
+	keyword string,
+	operatorName string,
+) *gorm.DB {
 	query := r.db.WithContext(ctx).Model(&Unban{})
 	if strings.TrimSpace(keyword) != "" {
 		value := "%" + strings.ToLower(strings.TrimSpace(keyword)) + "%"
 		query = query.Where("LOWER(namespace) LIKE ?", value)
 	}
+
 	if strings.TrimSpace(operatorName) != "" {
 		query = query.Where("operator_name = ?", strings.TrimSpace(operatorName))
 	}

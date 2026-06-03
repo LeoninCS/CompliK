@@ -163,6 +163,7 @@ func (h *Handler) ListBansPage(c *gin.Context) {
 			"message": "invalid request query",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 

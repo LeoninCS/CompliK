@@ -95,12 +95,14 @@ func (r *Repository) ListViolationsPage(
 	options violationquery.ListOptions,
 ) ([]ProcscanViolationEvent, int64, error) {
 	var total int64
+
 	countQuery := r.buildListQuery(ctx, options.IncludeAll, options)
 	if err := countQuery.Model(&ProcscanViolationEvent{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var violations []ProcscanViolationEvent
+
 	query := r.buildListQuery(ctx, options.IncludeAll, options)
 	if err := query.
 		Order("detected_at DESC, id DESC").
@@ -122,9 +124,11 @@ func (r *Repository) buildListQuery(
 	if !includeAll {
 		query = query.Where(procscanEffectiveViolationCondition)
 	}
+
 	if options.StartTime != nil {
 		query = query.Where("detected_at >= ?", *options.StartTime)
 	}
+
 	if options.Keyword != "" {
 		keyword := "%" + strings.ToLower(options.Keyword) + "%"
 		query = query.Where(

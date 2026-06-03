@@ -142,6 +142,7 @@ func (s *Service) ListProjectConfigsPage(
 	}
 
 	response := pagequery.NewPaginatedResponse(responses, total, options)
+
 	return &response, nil
 }
 

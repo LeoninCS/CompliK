@@ -168,6 +168,7 @@ func (s *Service) ListCommitmentsPage(
 	}
 
 	response := pagequery.NewPaginatedResponse(responses, total, options)
+
 	return &response, nil
 }
 

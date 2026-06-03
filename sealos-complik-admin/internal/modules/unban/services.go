@@ -105,6 +105,7 @@ func (s *Service) ListUnbansPage(
 	}
 
 	response := pagequery.NewPaginatedResponse(responses, total, options)
+
 	return &response, nil
 }
 

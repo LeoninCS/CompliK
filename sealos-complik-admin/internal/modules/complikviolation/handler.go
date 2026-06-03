@@ -116,6 +116,7 @@ func (h *Handler) ListViolations(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, resp)
+
 		return
 	}
 

@@ -53,12 +53,14 @@ func (r *Repository) ListCommitmentsPage(
 	keyword string,
 ) ([]Commitment, int64, error) {
 	var total int64
+
 	countQuery := r.buildListQuery(ctx, keyword)
 	if err := countQuery.Model(&Commitment{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var commitments []Commitment
+
 	query := r.buildListQuery(ctx, keyword)
 	if err := query.
 		Order("updated_at DESC, id DESC").

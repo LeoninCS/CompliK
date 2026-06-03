@@ -169,6 +169,7 @@ func (s *Service) ListBansPage(
 	}
 
 	response := pagequery.NewPaginatedResponse(responses, total, options)
+
 	return &response, nil
 }
 

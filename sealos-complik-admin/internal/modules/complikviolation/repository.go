@@ -91,12 +91,14 @@ func (r *Repository) ListViolationsPage(
 	options violationquery.ListOptions,
 ) ([]ComplikViolationEvent, int64, error) {
 	var total int64
+
 	countQuery := r.buildListQuery(ctx, options.IncludeAll, options)
 	if err := countQuery.Model(&ComplikViolationEvent{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var violations []ComplikViolationEvent
+
 	query := r.buildListQuery(ctx, options.IncludeAll, options)
 	if err := query.
 		Order("detected_at DESC, id DESC").
@@ -118,9 +120,11 @@ func (r *Repository) buildListQuery(
 	if !includeAll {
 		query = query.Where(complikEffectiveViolationCondition)
 	}
+
 	if options.StartTime != nil {
 		query = query.Where("detected_at >= ?", *options.StartTime)
 	}
+
 	if options.Keyword != "" {
 		keyword := "%" + strings.ToLower(options.Keyword) + "%"
 		query = query.Where(

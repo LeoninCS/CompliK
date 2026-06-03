@@ -32,6 +32,7 @@ func NewOptions(page int) (Options, error) {
 	if page == 0 {
 		page = 1
 	}
+
 	if page < 1 {
 		return Options{}, ErrInvalidQuery
 	}

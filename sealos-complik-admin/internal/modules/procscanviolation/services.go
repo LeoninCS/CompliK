@@ -153,6 +153,7 @@ func (s *Service) ListViolationsPage(
 	}
 
 	response := pagequery.NewPaginatedResponse(responses, total, options.Options)
+
 	return &response, nil
 }
 

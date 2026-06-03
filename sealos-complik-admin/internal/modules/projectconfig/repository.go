@@ -53,12 +53,14 @@ func (r *Repository) ListProjectConfigsPage(
 	keyword string,
 ) ([]ProjectConfig, int64, error) {
 	var total int64
+
 	countQuery := r.buildListQuery(ctx, keyword)
 	if err := countQuery.Model(&ProjectConfig{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var projectConfigs []ProjectConfig
+
 	query := r.buildListQuery(ctx, keyword)
 	if err := query.
 		Order("updated_at DESC, id DESC").

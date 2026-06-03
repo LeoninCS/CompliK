@@ -99,6 +99,7 @@ func (h *Handler) ListUnbansPage(c *gin.Context) {
 			"message": "invalid request query",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
@@ -110,7 +111,12 @@ func (h *Handler) ListUnbansPage(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.ListUnbansPage(c.Request.Context(), options, req.Keyword, req.OperatorName)
+	resp, err := h.service.ListUnbansPage(
+		c.Request.Context(),
+		options,
+		req.Keyword,
+		req.OperatorName,
+	)
 	if err != nil {
 		h.respondWithServiceError(c, err, "failed to list unbans")
 		return

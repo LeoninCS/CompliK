@@ -169,6 +169,7 @@ func (h *Handler) ListCommitmentsPage(c *gin.Context) {
 			"message": "invalid request query",
 			"error":   err.Error(),
 		})
+
 		return
 	}
 
