@@ -31,6 +31,10 @@ export type QuickLinkItem = {
 
 export type ViolationType = "complik" | "procscan";
 
+export type ViolationScope = "violations" | "all";
+
+export type ViolationTimeRange = "24h" | "7d" | "30d" | "all";
+
 export type ViolationRecord = {
   id: string;
   apiId: number;
@@ -161,6 +165,36 @@ export type CreateUnbanInput = {
 export type DeleteViolationInput = {
   id: number;
   type: ViolationType;
+};
+
+export type ViolationListQuery = {
+  type: ViolationType;
+  scope: ViolationScope;
+  page: number;
+  keyword: string;
+  timeRange: ViolationTimeRange;
+};
+
+export type PaginatedViolationRecords = {
+  list: ViolationRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export type PaginatedRecords<T> = {
+  list: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export type RecordListQuery = {
+  page: number;
+  keyword?: string;
+  operatorName?: string;
 };
 
 export type AppDataContextValue = {

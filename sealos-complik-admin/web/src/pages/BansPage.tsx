@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
@@ -10,15 +10,16 @@ import {
   Input,
   Modal,
   PageHeader,
+  PaginationControls,
   Select,
   SurfaceCard,
 } from "../components/ui";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { useAppData } from "../contexts/AppDataContext";
 import { useManagedOperatorOptions } from "../hooks/useOperatorOptions";
-import { buildBanScreenshotPreviewURL } from "../lib/api";
+import { buildBanScreenshotPreviewURL, listBanRecordsPage } from "../lib/api";
 import { summarizeMarkdown } from "../lib/utils";
-import type { BanRecord } from "../types";
+import type { BanRecord, PaginatedRecords } from "../types";
 
 export function BansPage() {
   const navigate = useNavigate();
@@ -28,6 +29,16 @@ export function BansPage() {
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState(() => searchParams.get("namespace") ?? "");
   const [operatorFilter, setOperatorFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<PaginatedRecords<BanRecord>>({
+    list: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 0,
+  });
+  const [listError, setListError] = useState<string | null>(null);
+  const [isListLoading, setIsListLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<BanRecord | null>(null);
   const [namespace, setNamespace] = useState("");
   const [reason, setReason] = useState("");
@@ -68,7 +79,40 @@ export function BansPage() {
 
   useEffect(() => {
     setKeyword(searchParams.get("namespace") ?? "");
+    setPage(1);
   }, [searchParams]);
+
+  const loadRows = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
+    try {
+      const nextData = await listBanRecordsPage({
+        page,
+        keyword,
+        operatorName: operatorFilter,
+      });
+      if (nextData.totalPages > 0 && page > nextData.totalPages) {
+        setPage(nextData.totalPages);
+        return;
+      }
+      setData(nextData);
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : "封禁记录加载失败");
+      setData({
+        list: [],
+        total: 0,
+        page,
+        pageSize: 10,
+        totalPages: 0,
+      });
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [keyword, operatorFilter, page]);
+
+  useEffect(() => {
+    void loadRows();
+  }, [loadRows]);
 
   const appendScreenshots = (files: File[]) => {
     if (files.length === 0) {
@@ -108,17 +152,7 @@ export function BansPage() {
     setFormError(null);
   };
 
-  const rows = useMemo(() => {
-    return banRecords.filter((item) => {
-      if (keyword && !item.namespace.toLowerCase().includes(keyword.toLowerCase())) {
-        return false;
-      }
-      if (operatorFilter && item.operatorName !== operatorFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [banRecords, keyword, operatorFilter]);
+  const rows = data.list;
 
   const handleCreateBan = async () => {
     if (submitting) {
@@ -140,6 +174,7 @@ export function BansPage() {
       });
       setOpen(false);
       resetForm();
+      await loadRows();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "新增封禁记录失败");
     } finally {
@@ -159,10 +194,23 @@ export function BansPage() {
       <SurfaceCard>
         <div className="toolbar">
           <Field label="namespace">
-            <Input placeholder="按 namespace 搜索" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+            <Input
+              placeholder="按 namespace 搜索"
+              value={keyword}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setPage(1);
+              }}
+            />
           </Field>
           <Field label="操作人">
-            <Select value={operatorFilter} onChange={(event) => setOperatorFilter(event.target.value)}>
+            <Select
+              value={operatorFilter}
+              onChange={(event) => {
+                setOperatorFilter(event.target.value);
+                setPage(1);
+              }}
+            >
               <option value="">全部操作人</option>
               {operatorOptions.map((option) => (
                 <option key={option} value={option}>
@@ -175,7 +223,19 @@ export function BansPage() {
       </SurfaceCard>
 
       <SurfaceCard className="data-table-wrap" padded={false}>
-        {rows.length > 0 ? (
+        {listError ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState
+              title="封禁记录加载失败"
+              description={listError}
+              action={<Button variant="secondary" onClick={() => void loadRows()}>重新加载</Button>}
+            />
+          </div>
+        ) : isListLoading ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState title="封禁记录加载中" description="正在同步当前页数据。" />
+          </div>
+        ) : rows.length > 0 ? (
           <table className="data-table">
             <thead>
               <tr>
@@ -220,6 +280,14 @@ export function BansPage() {
           </div>
         )}
       </SurfaceCard>
+
+      <PaginationControls
+        page={page}
+        pageSize={data.pageSize}
+        total={data.total}
+        totalPages={data.totalPages}
+        onPageChange={setPage}
+      />
 
       <Drawer
         description="这里展示描述内容和截图附件。"
@@ -416,6 +484,7 @@ export function BansPage() {
               setSelected(null);
             }
             setPendingDelete(null);
+            void loadRows();
           });
         }}
         open={Boolean(pendingDelete)}

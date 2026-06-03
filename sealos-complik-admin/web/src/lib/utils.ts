@@ -88,3 +88,25 @@ export function summarizeMarkdown(value: string, maxLength = 80) {
 
   return `${collapsed.slice(0, maxLength).trim()}...`;
 }
+
+export const FIXED_PAGE_SIZE = 10;
+
+export function clampPage(page: number, totalPages: number) {
+  if (totalPages <= 0) return 1;
+  return Math.min(Math.max(page, 1), totalPages);
+}
+
+export function paginateItems<T>(items: T[], page: number, pageSize = FIXED_PAGE_SIZE) {
+  const total = items.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const safePage = clampPage(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+
+  return {
+    list: items.slice(start, start + pageSize),
+    total,
+    page: safePage,
+    pageSize,
+    totalPages,
+  };
+}

@@ -14,6 +14,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route index element={<Navigate replace to="/overview" />} />
         <Route path="/overview" element={<OverviewPage />} />
+        <Route path="/namespaces" element={<NamespaceDetailPage />} />
         <Route path="/namespaces/:namespace" element={<NamespaceDetailPage />} />
         <Route path="/violations" element={<ViolationsPage />} />
         <Route path="/configs" element={<ConfigsPage />} />

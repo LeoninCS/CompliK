@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   ConfirmModal,
@@ -9,11 +9,13 @@ import {
   Input,
   Modal,
   PageHeader,
+  PaginationControls,
   SurfaceCard,
   TextArea,
 } from "../components/ui";
 import { useAppData } from "../contexts/AppDataContext";
-import type { ConfigRecord, CreateConfigInput } from "../types";
+import { listConfigRecordsPage } from "../lib/api";
+import type { ConfigRecord, CreateConfigInput, PaginatedRecords } from "../types";
 
 type ImportConfigRecord = {
   config_name?: unknown;
@@ -85,12 +87,22 @@ function parseImportedConfigs(source: string): CreateConfigInput[] {
 }
 
 export function ConfigsPage() {
-  const { configRecords, createConfigRecord, updateConfigRecord, deleteConfigRecord } = useAppData();
+  const { createConfigRecord, updateConfigRecord, deleteConfigRecord } = useAppData();
   const [selected, setSelected] = useState<ConfigRecord | null>(null);
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [nameKeyword, setNameKeyword] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<PaginatedRecords<ConfigRecord>>({
+    list: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 0,
+  });
+  const [listError, setListError] = useState<string | null>(null);
+  const [isListLoading, setIsListLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ConfigRecord | null>(null);
   const [configName, setConfigName] = useState("");
   const [configType, setConfigType] = useState("");
@@ -108,14 +120,38 @@ export function ConfigsPage() {
   const [importSubmitting, setImportSubmitting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
-  const rows = useMemo(() => {
-    return configRecords.filter((item) => {
-      if (nameKeyword && !item.configName.toLowerCase().includes(nameKeyword.toLowerCase())) {
-        return false;
+  const loadRows = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
+    try {
+      const nextData = await listConfigRecordsPage({
+        page,
+        keyword: nameKeyword,
+      });
+      if (nextData.totalPages > 0 && page > nextData.totalPages) {
+        setPage(nextData.totalPages);
+        return;
       }
-      return true;
-    });
-  }, [configRecords, nameKeyword]);
+      setData(nextData);
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : "项目配置加载失败");
+      setData({
+        list: [],
+        total: 0,
+        page,
+        pageSize: 10,
+        totalPages: 0,
+      });
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [nameKeyword, page]);
+
+  useEffect(() => {
+    void loadRows();
+  }, [loadRows]);
+
+  const rows = data.list;
 
   const handleCreateConfig = async () => {
     if (!configName.trim() || !configType.trim() || !value.trim()) {
@@ -144,6 +180,7 @@ export function ConfigsPage() {
       setConfigType("");
       setDescription("");
       setValue('{\n  "enabled": true,\n  "threshold": 3\n}');
+      await loadRows();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "新增配置失败");
     } finally {
@@ -201,6 +238,7 @@ export function ConfigsPage() {
       }
       setImportOpen(false);
       setImportValue("");
+      await loadRows();
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "导入配置失败");
     } finally {
@@ -253,6 +291,7 @@ export function ConfigsPage() {
           : prev,
       );
       setEditOpen(false);
+      await loadRows();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "修改配置失败");
     } finally {
@@ -295,13 +334,32 @@ export function ConfigsPage() {
       <SurfaceCard>
         <div className="toolbar">
           <Field label="配置名搜索">
-            <Input placeholder="按 config_name 搜索" value={nameKeyword} onChange={(event) => setNameKeyword(event.target.value)} />
+            <Input
+              placeholder="按 config_name 搜索"
+              value={nameKeyword}
+              onChange={(event) => {
+                setNameKeyword(event.target.value);
+                setPage(1);
+              }}
+            />
           </Field>
         </div>
       </SurfaceCard>
 
       <SurfaceCard className="data-table-wrap" padded={false}>
-        {rows.length > 0 ? (
+        {listError ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState
+              title="项目配置加载失败"
+              description={listError}
+              action={<Button variant="secondary" onClick={() => void loadRows()}>重新加载</Button>}
+            />
+          </div>
+        ) : isListLoading ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState title="项目配置加载中" description="正在同步当前页数据。" />
+          </div>
+        ) : rows.length > 0 ? (
           <table className="data-table">
             <thead>
               <tr>
@@ -340,6 +398,14 @@ export function ConfigsPage() {
           </div>
         )}
       </SurfaceCard>
+
+      <PaginationControls
+        page={page}
+        pageSize={data.pageSize}
+        total={data.total}
+        totalPages={data.totalPages}
+        onPageChange={setPage}
+      />
 
       <Drawer
         description="右侧抽屉展示配置详情，并保留足够宽度展示 JSON 内容。"
@@ -523,6 +589,7 @@ export function ConfigsPage() {
               setSelected(null);
             }
             setPendingDelete(null);
+            void loadRows();
           });
         }}
         open={Boolean(pendingDelete)}

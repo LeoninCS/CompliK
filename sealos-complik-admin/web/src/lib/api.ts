@@ -8,7 +8,11 @@ import type {
   CreateConfigInput,
   UpdateConfigInput,
   CreateUnbanInput,
+  PaginatedViolationRecords,
+  PaginatedRecords,
+  RecordListQuery,
   UnbanRecord,
+  ViolationListQuery,
   ViolationRecord,
 } from "../types";
 
@@ -89,6 +93,45 @@ type ProcscanViolationDto = {
   created_at?: string;
   updated_at?: string;
 };
+
+type PaginatedDto<T> = {
+  list: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
+function toPaginatedRecords<TDto, TRecord>(
+  data: PaginatedDto<TDto>,
+  mapper: (item: TDto) => TRecord,
+): PaginatedRecords<TRecord> {
+  return {
+    list: data.list.map(mapper),
+    total: data.total,
+    page: data.page,
+    pageSize: data.page_size,
+    totalPages: data.total_pages,
+  };
+}
+
+function buildRecordListParams(query: RecordListQuery) {
+  const params = new URLSearchParams({
+    page: String(query.page),
+  });
+
+  const keyword = query.keyword?.trim();
+  if (keyword) {
+    params.set("keyword", keyword);
+  }
+
+  const operatorName = query.operatorName?.trim();
+  if (operatorName) {
+    params.set("operator_name", operatorName);
+  }
+
+  return params;
+}
 
 async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -278,6 +321,11 @@ export async function listConfigRecords() {
   return data.map(toConfigRecord);
 }
 
+export async function listConfigRecordsPage(query: RecordListQuery): Promise<PaginatedRecords<ConfigRecord>> {
+  const data = await request<PaginatedDto<ProjectConfigDto>>(`/api/configs?${buildRecordListParams(query).toString()}`);
+  return toPaginatedRecords(data, toConfigRecord);
+}
+
 export async function createConfigRecord(input: CreateConfigInput) {
   await request("/api/configs", {
     method: "POST",
@@ -311,6 +359,11 @@ export async function updateConfigRecord(configName: string, input: UpdateConfig
 export async function listCommitmentRecords() {
   const data = await request<CommitmentDto[]>("/api/commitments");
   return data.map(toCommitmentRecord);
+}
+
+export async function listCommitmentRecordsPage(query: RecordListQuery): Promise<PaginatedRecords<CommitmentRecord>> {
+  const data = await request<PaginatedDto<CommitmentDto>>(`/api/commitments?${buildRecordListParams(query).toString()}`);
+  return toPaginatedRecords(data, toCommitmentRecord);
 }
 
 export async function createCommitmentRecord(input: CreateCommitmentInput) {
@@ -361,6 +414,11 @@ export function buildBanScreenshotPreviewURL(fileURL: string) {
 export async function listBanRecords() {
   const data = await request<BanDto[]>("/api/bans");
   return data.map(toBanRecord);
+}
+
+export async function listBanRecordsPage(query: RecordListQuery): Promise<PaginatedRecords<BanRecord>> {
+  const data = await request<PaginatedDto<BanDto>>(`/api/bans?${buildRecordListParams(query).toString()}`);
+  return toPaginatedRecords(data, toBanRecord);
 }
 
 export async function createBanRecord(input: CreateBanInput) {
@@ -426,6 +484,11 @@ export async function listUnbanRecords() {
   return data.map(toUnbanRecord);
 }
 
+export async function listUnbanRecordsPage(query: RecordListQuery): Promise<PaginatedRecords<UnbanRecord>> {
+  const data = await request<PaginatedDto<UnbanDto>>(`/api/unbans?${buildRecordListParams(query).toString()}`);
+  return toPaginatedRecords(data, toUnbanRecord);
+}
+
 export async function createUnbanRecord(input: CreateUnbanInput) {
   await request("/api/unbans", {
     method: "POST",
@@ -452,6 +515,27 @@ export async function listViolationRecords() {
     ...complikData.filter(isComplikIllegal).map(toComplikViolationRecord),
     ...procscanData.filter(isProcscanIllegal).map(toProcscanViolationRecord),
   ].sort((a, b) => toTimestamp(b.detectedAt) - toTimestamp(a.detectedAt));
+}
+
+export async function listViolationRecordsPage(query: ViolationListQuery): Promise<PaginatedViolationRecords> {
+  const params = new URLSearchParams({
+    include_all: String(query.scope === "all"),
+    page: String(query.page),
+    time_range: query.timeRange,
+  });
+
+  const keyword = query.keyword.trim();
+  if (keyword) {
+    params.set("keyword", keyword);
+  }
+
+  if (query.type === "complik") {
+    const data = await request<PaginatedDto<ComplikViolationDto>>(`/api/complik-violations?${params.toString()}`);
+    return toPaginatedRecords(data, toComplikViolationRecord);
+  }
+
+  const data = await request<PaginatedDto<ProcscanViolationDto>>(`/api/procscan-violations?${params.toString()}`);
+  return toPaginatedRecords(data, toProcscanViolationRecord);
 }
 
 export async function deleteViolationRecord(id: number, type: ViolationRecord["type"]) {
