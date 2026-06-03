@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/modules/violationquery"
 )
 
 type Handler struct {
@@ -101,6 +103,22 @@ func (h *Handler) ListViolations(c *gin.Context) {
 		return
 	}
 
+	if hasPageQuery(c) {
+		options, ok := bindListOptionsQuery(c, includeAll)
+		if !ok {
+			return
+		}
+
+		resp, err := h.service.ListViolationsPage(c.Request.Context(), options)
+		if err != nil {
+			h.respondWithServiceError(c, err, "failed to list procscan violations")
+			return
+		}
+
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
 	resp, err := h.service.ListViolations(c.Request.Context(), includeAll)
 	if err != nil {
 		h.respondWithServiceError(c, err, "failed to list procscan violations")
@@ -156,6 +174,55 @@ func bindIncludeAllQuery(c *gin.Context) (bool, bool) {
 	}
 
 	return includeAll, true
+}
+
+func hasPageQuery(c *gin.Context) bool {
+	raw := strings.TrimSpace(c.Query("page"))
+	return raw != ""
+}
+
+func bindListOptionsQuery(c *gin.Context, includeAll bool) (violationquery.ListOptions, bool) {
+	page, ok := bindPageQuery(c)
+	if !ok {
+		return violationquery.ListOptions{}, false
+	}
+
+	options, err := violationquery.NewListOptions(violationquery.ListInput{
+		IncludeAll: includeAll,
+		Page:       page,
+		Keyword:    c.Query("keyword"),
+		TimeRange:  c.Query("time_range"),
+		Now:        time.Now(),
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid violation list query",
+			"error":   err.Error(),
+		})
+
+		return violationquery.ListOptions{}, false
+	}
+
+	return options, true
+}
+
+func bindPageQuery(c *gin.Context) (int, bool) {
+	raw := strings.TrimSpace(c.Query("page"))
+	if raw == "" {
+		return 1, true
+	}
+
+	page, err := strconv.Atoi(raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid page query",
+			"error":   err.Error(),
+		})
+
+		return 0, false
+	}
+
+	return page, true
 }
 
 func (h *Handler) respondWithServiceError(c *gin.Context, err error, fallbackMessage string) {

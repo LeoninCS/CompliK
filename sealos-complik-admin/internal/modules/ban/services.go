@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 var (
@@ -149,6 +150,26 @@ func (s *Service) ListBans(ctx context.Context) ([]BanResponse, error) {
 	}
 
 	return responses, nil
+}
+
+func (s *Service) ListBansPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+	operatorName string,
+) (*PaginatedBanResponse, error) {
+	bans, total, err := s.repository.ListBansPage(ctx, options, keyword, operatorName)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]BanResponse, 0, len(bans))
+	for i := range bans {
+		responses = append(responses, *toBanResponse(&bans[i]))
+	}
+
+	response := pagequery.NewPaginatedResponse(responses, total, options)
+	return &response, nil
 }
 
 // GetBanStatus returns whether the given namespace is currently banned.

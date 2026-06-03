@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type Handler struct {
@@ -141,7 +142,39 @@ func (h *Handler) GetBans(c *gin.Context) {
 
 // ListBans handles listing all ban records.
 func (h *Handler) ListBans(c *gin.Context) {
+	if pagequery.HasPage(c.Query("page")) {
+		h.ListBansPage(c)
+		return
+	}
+
 	resp, err := h.service.ListBans(c.Request.Context())
+	if err != nil {
+		h.respondWithServiceError(c, err, "failed to list bans")
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListBansPage(c *gin.Context) {
+	var req ListBansQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid request query",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	options, err := pagequery.NewOptions(req.Page)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid page query",
+		})
+		return
+	}
+
+	resp, err := h.service.ListBansPage(c.Request.Context(), options, req.Keyword, req.OperatorName)
 	if err != nil {
 		h.respondWithServiceError(c, err, "failed to list bans")
 		return

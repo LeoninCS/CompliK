@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type Handler struct {
@@ -121,7 +122,39 @@ func (h *Handler) GetProjectConfig(c *gin.Context) {
 
 // ListProjectConfigs handles listing all project configurations.
 func (h *Handler) ListProjectConfigs(c *gin.Context) {
+	if pagequery.HasPage(c.Query("page")) {
+		h.ListProjectConfigsPage(c)
+		return
+	}
+
 	resp, err := h.service.ListProjectConfigs(c.Request.Context())
+	if err != nil {
+		h.respondWithServiceError(c, err, "failed to list project configs")
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListProjectConfigsPage(c *gin.Context) {
+	var req ListProjectConfigsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid request query",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	options, err := pagequery.NewOptions(req.Page)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid page query",
+		})
+		return
+	}
+
+	resp, err := h.service.ListProjectConfigsPage(c.Request.Context(), options, req.Keyword)
 	if err != nil {
 		h.respondWithServiceError(c, err, "failed to list project configs")
 		return

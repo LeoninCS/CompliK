@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 var (
@@ -149,6 +150,25 @@ func (s *Service) ListCommitments(ctx context.Context) ([]CommitmentResponse, er
 	}
 
 	return responses, nil
+}
+
+func (s *Service) ListCommitmentsPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+) (*PaginatedCommitmentResponse, error) {
+	commitments, total, err := s.repository.ListCommitmentsPage(ctx, options, keyword)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]CommitmentResponse, 0, len(commitments))
+	for i := range commitments {
+		responses = append(responses, *toCommitmentResponse(&commitments[i]))
+	}
+
+	response := pagequery.NewPaginatedResponse(responses, total, options)
+	return &response, nil
 }
 
 // UploadCommitment uploads commitment PDF and upserts commitment metadata by namespace.

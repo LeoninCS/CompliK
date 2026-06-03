@@ -1,6 +1,10 @@
 package unban
 
-import "time"
+import (
+	"time"
+
+	"sealos-complik-admin/internal/modules/pagequery"
+)
 
 type UnbanNamespaceRequest struct {
 	Namespace string `uri:"namespace" binding:"required,max=255"`
@@ -8,6 +12,12 @@ type UnbanNamespaceRequest struct {
 
 type UnbanIDRequest struct {
 	ID uint64 `uri:"id" binding:"required,min=1"`
+}
+
+type ListUnbansQueryRequest struct {
+	Page         int    `form:"page"`
+	Keyword      string `form:"keyword"`
+	OperatorName string `form:"operator_name"`
 }
 
 type CreateUnbanRequest struct {
@@ -22,3 +32,5 @@ type UnbanResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
+
+type PaginatedUnbanResponse = pagequery.PaginatedResponse[UnbanResponse]

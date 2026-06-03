@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
+	"sealos-complik-admin/internal/modules/violationquery"
 )
 
 var (
@@ -143,6 +145,28 @@ func (s *Service) ListViolations(
 	}
 
 	return responses, nil
+}
+
+func (s *Service) ListViolationsPage(
+	ctx context.Context,
+	options violationquery.ListOptions,
+) (*PaginatedViolationResponse, error) {
+	violations, total, err := s.repository.ListViolationsPage(ctx, options)
+	if err != nil {
+		return nil, translateRepositoryError(err)
+	}
+
+	responses := make([]ViolationResponse, 0, len(violations))
+	for i := range violations {
+		if !options.IncludeAll && !isEffectiveViolation(&violations[i]) {
+			continue
+		}
+
+		responses = append(responses, *toViolationResponse(&violations[i]))
+	}
+
+	response := pagequery.NewPaginatedResponse(responses, total, options.Options)
+	return &response, nil
 }
 
 func (s *Service) GetViolationStatus(

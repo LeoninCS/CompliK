@@ -2,8 +2,10 @@ package projectconfig
 
 import (
 	"context"
+	"strings"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type Repository struct {
@@ -43,6 +45,40 @@ func (r *Repository) ListProjectConfigs(ctx context.Context) ([]ProjectConfig, e
 	}
 
 	return projectConfigs, nil
+}
+
+func (r *Repository) ListProjectConfigsPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+) ([]ProjectConfig, int64, error) {
+	var total int64
+	countQuery := r.buildListQuery(ctx, keyword)
+	if err := countQuery.Model(&ProjectConfig{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var projectConfigs []ProjectConfig
+	query := r.buildListQuery(ctx, keyword)
+	if err := query.
+		Order("updated_at DESC, id DESC").
+		Limit(options.PageSize).
+		Offset(options.Offset()).
+		Find(&projectConfigs).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return projectConfigs, total, nil
+}
+
+func (r *Repository) buildListQuery(ctx context.Context, keyword string) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&ProjectConfig{})
+	if strings.TrimSpace(keyword) != "" {
+		value := "%" + strings.ToLower(strings.TrimSpace(keyword)) + "%"
+		query = query.Where("LOWER(config_name) LIKE ?", value)
+	}
+
+	return query
 }
 
 // ListProjectConfigsByType returns project configurations filtered by config type.

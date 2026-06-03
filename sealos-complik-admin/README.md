@@ -106,6 +106,8 @@ Notes:
 - `oss.object_prefix` is used for commitment and ban screenshot object keys.
 - Ban screenshots support admin-side proxy preview through `/api/bans/screenshots`.
 - CompliK and Procscan violation list endpoints return illegal events by default. `include_all=true` returns the full event stream.
+- List endpoints for configs, commitments, bans, unbans, and violations support `page`. Paginated responses use a fixed page size of 10.
+- Violation list endpoints also support `keyword` and `time_range` (`24h`, `7d`, `30d`, `all`).
 
 ### Run Locally
 
@@ -145,26 +147,26 @@ If MySQL is not running inside the same network as the container, update `config
 | --- | --- | --- |
 | `GET` | `/health` | Health check |
 | `POST` | `/api/configs` | Create project config |
-| `GET` | `/api/configs` | List project configs |
+| `GET` | `/api/configs` | List project configs; `page` and `keyword` return paginated results |
 | `GET` | `/api/configs/type/:config_type` | List project configs by type |
 | `GET` | `/api/configs/:config_name` | Get project config by name |
 | `PUT` | `/api/configs/:config_name` | Update project config |
 | `DELETE` | `/api/configs/:config_name` | Delete project config |
 | `POST` | `/api/commitments` | Create commitment |
 | `POST` | `/api/commitments/upload` | Upload commitment file |
-| `GET` | `/api/commitments` | List commitments |
+| `GET` | `/api/commitments` | List commitments; `page` and `keyword` return paginated results |
 | `GET` | `/api/commitments/:namespace` | Get commitment by namespace |
 | `GET` | `/api/commitments/:namespace/download` | Download commitment file |
 | `PUT` | `/api/commitments/:namespace` | Update commitment |
 | `DELETE` | `/api/commitments/:namespace` | Delete commitment |
 | `POST` | `/api/complik-violations` | Create CompliK violation event |
-| `GET` | `/api/complik-violations` | List CompliK illegal events, `include_all=true` returns all events |
+| `GET` | `/api/complik-violations` | List CompliK illegal events, `include_all=true` returns all events; `page`, `keyword`, and `time_range` return paginated results |
 | `GET` | `/api/complik-violations/:namespace` | Get CompliK events by namespace |
 | `DELETE` | `/api/complik-violations/id/:id` | Delete CompliK event by id |
 | `DELETE` | `/api/complik-violations/:namespace` | Delete CompliK events by namespace |
 | `GET` | `/api/namespaces/:namespace/complik-violations-status` | Check whether a namespace has CompliK illegal events |
 | `POST` | `/api/procscan-violations` | Create Procscan violation event |
-| `GET` | `/api/procscan-violations` | List Procscan illegal events, `include_all=true` returns all events |
+| `GET` | `/api/procscan-violations` | List Procscan illegal events, `include_all=true` returns all events; `page`, `keyword`, and `time_range` return paginated results |
 | `GET` | `/api/procscan-violations/:namespace` | Get Procscan events by namespace |
 | `DELETE` | `/api/procscan-violations/id/:id` | Delete Procscan event by id |
 | `DELETE` | `/api/procscan-violations/:namespace` | Delete Procscan events by namespace |
@@ -172,12 +174,12 @@ If MySQL is not running inside the same network as the container, update `config
 | `POST` | `/api/bans` | Create ban record |
 | `POST` | `/api/bans/upload` | Create ban record with screenshot upload |
 | `GET` | `/api/bans/screenshots` | Proxy preview for ban screenshots |
-| `GET` | `/api/bans` | List ban records |
+| `GET` | `/api/bans` | List ban records; `page`, `keyword`, and `operator_name` return paginated results |
 | `GET` | `/api/bans/:namespace` | Get bans by namespace |
 | `DELETE` | `/api/bans/id/:id` | Delete a ban record by id |
 | `GET` | `/api/namespaces/:namespace/ban-status` | Check whether a namespace is banned |
 | `POST` | `/api/unbans` | Create unban record |
-| `GET` | `/api/unbans` | List unban records |
+| `GET` | `/api/unbans` | List unban records; `page`, `keyword`, and `operator_name` return paginated results |
 | `GET` | `/api/unbans/:namespace` | Get unban records by namespace |
 | `DELETE` | `/api/unbans/id/:id` | Delete an unban record by id |
 
@@ -343,6 +345,8 @@ oss:
 - `oss.object_prefix` 用于承诺书和封禁截图对象路径前缀。
 - 封禁截图支持通过 `/api/bans/screenshots` 走 admin 代理预览。
 - CompliK 和 Procscan 违规列表接口默认返回违规事件，`include_all=true` 返回全量事件。
+- 配置、承诺书、封禁、解封和违规列表接口支持 `page`，分页响应每页固定 10 条。
+- 违规列表接口额外支持 `keyword` 和 `time_range`（`24h`、`7d`、`30d`、`all`）。
 
 ### 本地运行
 
@@ -382,26 +386,26 @@ docker run --rm -p 8080:8080 sealos-complik-admin
 | --- | --- | --- |
 | `GET` | `/health` | 健康检查 |
 | `POST` | `/api/configs` | 创建项目配置 |
-| `GET` | `/api/configs` | 查询项目配置列表 |
+| `GET` | `/api/configs` | 查询项目配置列表；`page`、`keyword` 返回分页结果 |
 | `GET` | `/api/configs/type/:config_type` | 按配置类型查询项目配置 |
 | `GET` | `/api/configs/:config_name` | 按名称查询项目配置 |
 | `PUT` | `/api/configs/:config_name` | 更新项目配置 |
 | `DELETE` | `/api/configs/:config_name` | 删除项目配置 |
 | `POST` | `/api/commitments` | 创建承诺记录 |
 | `POST` | `/api/commitments/upload` | 上传承诺书文件 |
-| `GET` | `/api/commitments` | 查询承诺记录列表 |
+| `GET` | `/api/commitments` | 查询承诺记录列表；`page`、`keyword` 返回分页结果 |
 | `GET` | `/api/commitments/:namespace` | 按 namespace 查询承诺记录 |
 | `GET` | `/api/commitments/:namespace/download` | 下载承诺书文件 |
 | `PUT` | `/api/commitments/:namespace` | 更新承诺记录 |
 | `DELETE` | `/api/commitments/:namespace` | 删除承诺记录 |
 | `POST` | `/api/complik-violations` | 创建 CompliK 违规事件 |
-| `GET` | `/api/complik-violations` | 查询 CompliK 违规事件列表，`include_all=true` 返回全量事件 |
+| `GET` | `/api/complik-violations` | 查询 CompliK 违规事件列表，`include_all=true` 返回全量事件；`page`、`keyword`、`time_range` 返回分页结果 |
 | `GET` | `/api/complik-violations/:namespace` | 按 namespace 查询 CompliK 事件 |
 | `DELETE` | `/api/complik-violations/id/:id` | 按 id 删除 CompliK 事件 |
 | `DELETE` | `/api/complik-violations/:namespace` | 按 namespace 删除 CompliK 事件 |
 | `GET` | `/api/namespaces/:namespace/complik-violations-status` | 查询 namespace 是否存在 CompliK 违规事件 |
 | `POST` | `/api/procscan-violations` | 创建 Procscan 违规事件 |
-| `GET` | `/api/procscan-violations` | 查询 Procscan 违规事件列表，`include_all=true` 返回全量事件 |
+| `GET` | `/api/procscan-violations` | 查询 Procscan 违规事件列表，`include_all=true` 返回全量事件；`page`、`keyword`、`time_range` 返回分页结果 |
 | `GET` | `/api/procscan-violations/:namespace` | 按 namespace 查询 Procscan 事件 |
 | `DELETE` | `/api/procscan-violations/id/:id` | 按 id 删除 Procscan 事件 |
 | `DELETE` | `/api/procscan-violations/:namespace` | 按 namespace 删除 Procscan 事件 |
@@ -409,12 +413,12 @@ docker run --rm -p 8080:8080 sealos-complik-admin
 | `POST` | `/api/bans` | 创建封禁记录 |
 | `POST` | `/api/bans/upload` | 上传截图并创建封禁记录 |
 | `GET` | `/api/bans/screenshots` | admin 代理预览封禁截图 |
-| `GET` | `/api/bans` | 查询封禁记录列表 |
+| `GET` | `/api/bans` | 查询封禁记录列表；`page`、`keyword`、`operator_name` 返回分页结果 |
 | `GET` | `/api/bans/:namespace` | 按 namespace 查询封禁记录 |
 | `DELETE` | `/api/bans/id/:id` | 按 id 删除封禁记录 |
 | `GET` | `/api/namespaces/:namespace/ban-status` | 查询 namespace 是否处于封禁状态 |
 | `POST` | `/api/unbans` | 创建解封记录 |
-| `GET` | `/api/unbans` | 查询解封记录列表 |
+| `GET` | `/api/unbans` | 查询解封记录列表；`page`、`keyword`、`operator_name` 返回分页结果 |
 | `GET` | `/api/unbans/:namespace` | 按 namespace 查询解封记录 |
 | `DELETE` | `/api/unbans/id/:id` | 按 id 删除解封记录 |
 

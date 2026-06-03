@@ -2,8 +2,10 @@ package complikviolation
 
 import (
 	"context"
+	"strings"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/violationquery"
 )
 
 type Repository struct {
@@ -75,16 +77,63 @@ func (r *Repository) ListViolations(
 ) ([]ComplikViolationEvent, error) {
 	var violations []ComplikViolationEvent
 
-	query := r.db.WithContext(ctx)
-	if !includeAll {
-		query = query.Where(complikEffectiveViolationCondition)
-	}
+	query := r.buildListQuery(ctx, includeAll, violationquery.ListOptions{})
 
 	if err := query.Order("detected_at DESC, id DESC").Find(&violations).Error; err != nil {
 		return nil, err
 	}
 
 	return violations, nil
+}
+
+func (r *Repository) ListViolationsPage(
+	ctx context.Context,
+	options violationquery.ListOptions,
+) ([]ComplikViolationEvent, int64, error) {
+	var total int64
+	countQuery := r.buildListQuery(ctx, options.IncludeAll, options)
+	if err := countQuery.Model(&ComplikViolationEvent{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var violations []ComplikViolationEvent
+	query := r.buildListQuery(ctx, options.IncludeAll, options)
+	if err := query.
+		Order("detected_at DESC, id DESC").
+		Limit(options.PageSize).
+		Offset(options.Offset()).
+		Find(&violations).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return violations, total, nil
+}
+
+func (r *Repository) buildListQuery(
+	ctx context.Context,
+	includeAll bool,
+	options violationquery.ListOptions,
+) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&ComplikViolationEvent{})
+	if !includeAll {
+		query = query.Where(complikEffectiveViolationCondition)
+	}
+	if options.StartTime != nil {
+		query = query.Where("detected_at >= ?", *options.StartTime)
+	}
+	if options.Keyword != "" {
+		keyword := "%" + strings.ToLower(options.Keyword) + "%"
+		query = query.Where(
+			r.db.Where("LOWER(namespace) LIKE ?", keyword).
+				Or("LOWER(detector_name) LIKE ?", keyword).
+				Or("LOWER(resource_name) LIKE ?", keyword).
+				Or("LOWER(host) LIKE ?", keyword).
+				Or("LOWER(url) LIKE ?", keyword).
+				Or("LOWER(description) LIKE ?", keyword),
+		)
+	}
+
+	return query
 }
 
 func (r *Repository) DeleteViolationByID(ctx context.Context, id uint64) error {
