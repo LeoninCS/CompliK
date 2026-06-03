@@ -1,3 +1,6 @@
 .idea/
 *.tsbuildinfo
 /test/
+.superpowers/
+.fork-skill/
+codex-work/
