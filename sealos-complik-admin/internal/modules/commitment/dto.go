@@ -1,6 +1,10 @@
 package commitment
 
-import "time"
+import (
+	"time"
+
+	"sealos-complik-admin/internal/modules/pagequery"
+)
 
 type CommitmentNamespaceRequest struct {
 	Namespace string `uri:"namespace" binding:"required,max=255"`
@@ -16,6 +20,11 @@ type UploadCommitmentRequest struct {
 	Namespace string `form:"namespace" binding:"required,max=255"`
 }
 
+type ListCommitmentsQueryRequest struct {
+	Page    int    `form:"page"`
+	Keyword string `form:"keyword"`
+}
+
 type UpdateCommitmentRequest struct {
 	FileName string `json:"file_name" binding:"required,max=255"`
 	FileURL  string `json:"file_url"  binding:"required,max=512"`
@@ -28,3 +37,5 @@ type CommitmentResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type PaginatedCommitmentResponse = pagequery.PaginatedResponse[CommitmentResponse]

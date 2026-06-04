@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type Handler struct {
@@ -77,7 +78,45 @@ func (h *Handler) GetUnbans(c *gin.Context) {
 
 // ListUnbans handles listing all unban records.
 func (h *Handler) ListUnbans(c *gin.Context) {
+	if pagequery.HasPage(c.Query("page")) {
+		h.ListUnbansPage(c)
+		return
+	}
+
 	resp, err := h.service.ListUnbans(c.Request.Context())
+	if err != nil {
+		h.respondWithServiceError(c, err, "failed to list unbans")
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListUnbansPage(c *gin.Context) {
+	var req ListUnbansQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid request query",
+			"error":   err.Error(),
+		})
+
+		return
+	}
+
+	options, err := pagequery.NewOptions(req.Page)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid page query",
+		})
+		return
+	}
+
+	resp, err := h.service.ListUnbansPage(
+		c.Request.Context(),
+		options,
+		req.Keyword,
+		req.OperatorName,
+	)
 	if err != nil {
 		h.respondWithServiceError(c, err, "failed to list unbans")
 		return

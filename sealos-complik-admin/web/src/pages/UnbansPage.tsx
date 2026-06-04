@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Button,
@@ -10,12 +10,14 @@ import {
   Input,
   Modal,
   PageHeader,
+  PaginationControls,
   Select,
   SurfaceCard,
 } from "../components/ui";
 import { useAppData } from "../contexts/AppDataContext";
 import { useManagedOperatorOptions } from "../hooks/useOperatorOptions";
-import type { UnbanRecord } from "../types";
+import { listUnbanRecordsPage } from "../lib/api";
+import type { PaginatedRecords, UnbanRecord } from "../types";
 
 export function UnbansPage() {
   const navigate = useNavigate();
@@ -25,6 +27,16 @@ export function UnbansPage() {
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState(() => searchParams.get("namespace") ?? "");
   const [operatorFilter, setOperatorFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<PaginatedRecords<UnbanRecord>>({
+    list: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 0,
+  });
+  const [listError, setListError] = useState<string | null>(null);
+  const [isListLoading, setIsListLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<UnbanRecord | null>(null);
   const [namespace, setNamespace] = useState("");
   const [operatorName, setOperatorName] = useState("");
@@ -38,19 +50,42 @@ export function UnbansPage() {
 
   useEffect(() => {
     setKeyword(searchParams.get("namespace") ?? "");
+    setPage(1);
   }, [searchParams]);
 
-  const rows = useMemo(() => {
-    return unbanRecords.filter((item) => {
-      if (!item.namespace.toLowerCase().includes(keyword.toLowerCase())) {
-        return false;
+  const loadRows = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
+    try {
+      const nextData = await listUnbanRecordsPage({
+        page,
+        keyword,
+        operatorName: operatorFilter,
+      });
+      if (nextData.totalPages > 0 && page > nextData.totalPages) {
+        setPage(nextData.totalPages);
+        return;
       }
-      if (operatorFilter && item.operatorName !== operatorFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [keyword, operatorFilter, unbanRecords]);
+      setData(nextData);
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : "解封记录加载失败");
+      setData({
+        list: [],
+        total: 0,
+        page,
+        pageSize: 10,
+        totalPages: 0,
+      });
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [keyword, operatorFilter, page]);
+
+  useEffect(() => {
+    void loadRows();
+  }, [loadRows]);
+
+  const rows = data.list;
 
   const handleCreateUnban = async () => {
     if (!namespace.trim() || !operatorName.trim()) {
@@ -68,6 +103,7 @@ export function UnbansPage() {
       setOpen(false);
       setNamespace("");
       setOperatorName("");
+      await loadRows();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "新增解封记录失败");
     } finally {
@@ -87,10 +123,23 @@ export function UnbansPage() {
       <SurfaceCard>
         <div className="toolbar">
           <Field label="namespace">
-            <Input placeholder="按 namespace 搜索" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+            <Input
+              placeholder="按 namespace 搜索"
+              value={keyword}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setPage(1);
+              }}
+            />
           </Field>
           <Field label="操作人">
-            <Select value={operatorFilter} onChange={(event) => setOperatorFilter(event.target.value)}>
+            <Select
+              value={operatorFilter}
+              onChange={(event) => {
+                setOperatorFilter(event.target.value);
+                setPage(1);
+              }}
+            >
               <option value="">全部操作人</option>
               {operatorOptions.map((option) => (
                 <option key={option} value={option}>
@@ -110,7 +159,19 @@ export function UnbansPage() {
       </SurfaceCard>
 
       <SurfaceCard className="data-table-wrap" padded={false}>
-        {rows.length > 0 ? (
+        {listError ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState
+              title="解封记录加载失败"
+              description={listError}
+              action={<Button variant="secondary" onClick={() => void loadRows()}>重新加载</Button>}
+            />
+          </div>
+        ) : isListLoading ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState title="解封记录加载中" description="正在同步当前页数据。" />
+          </div>
+        ) : rows.length > 0 ? (
           <table className="data-table">
             <thead>
               <tr>
@@ -153,6 +214,14 @@ export function UnbansPage() {
           </div>
         )}
       </SurfaceCard>
+
+      <PaginationControls
+        page={page}
+        pageSize={data.pageSize}
+        total={data.total}
+        totalPages={data.totalPages}
+        onPageChange={setPage}
+      />
 
       <Drawer
         description="解封记录详情保持轻量，只展示当前接口已有字段。"
@@ -237,6 +306,7 @@ export function UnbansPage() {
               setSelected(null);
             }
             setPendingDelete(null);
+            void loadRows();
           });
         }}
         open={Boolean(pendingDelete)}

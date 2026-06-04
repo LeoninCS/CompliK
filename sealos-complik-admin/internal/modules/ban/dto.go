@@ -1,6 +1,10 @@
 package ban
 
-import "time"
+import (
+	"time"
+
+	"sealos-complik-admin/internal/modules/pagequery"
+)
 
 type BanNamespaceRequest struct {
 	Namespace string `uri:"namespace" binding:"required,max=255"`
@@ -12,6 +16,12 @@ type BanIDRequest struct {
 
 type BanScreenshotQueryRequest struct {
 	URL string `form:"url" binding:"required,max=2048"`
+}
+
+type ListBansQueryRequest struct {
+	Page         int    `form:"page"`
+	Keyword      string `form:"keyword"`
+	OperatorName string `form:"operator_name"`
 }
 
 type CreateBanRequest struct {
@@ -45,3 +55,5 @@ type BanResponse struct {
 type BanStatusResponse struct {
 	Banned bool `json:"banned"`
 }
+
+type PaginatedBanResponse = pagequery.PaginatedResponse[BanResponse]

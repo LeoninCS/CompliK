@@ -1,11 +1,17 @@
 import { ArrowRight, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppData } from "../contexts/AppDataContext";
-import { Button, PageHeader, StatusPill, SurfaceCard } from "../components/ui";
+import { Button, PageHeader, PaginationControls, StatusPill, SurfaceCard } from "../components/ui";
+import { paginateItems } from "../lib/utils";
 
 export function OverviewPage() {
   const navigate = useNavigate();
   const { latestActions, latestViolations, quickLinks, refreshAll, stats } = useAppData();
+  const [violationPage, setViolationPage] = useState(1);
+  const [actionPage, setActionPage] = useState(1);
+  const paginatedViolations = useMemo(() => paginateItems(latestViolations, violationPage), [latestViolations, violationPage]);
+  const paginatedActions = useMemo(() => paginateItems(latestActions, actionPage), [latestActions, actionPage]);
 
   return (
     <div className="page-container">
@@ -57,7 +63,7 @@ export function OverviewPage() {
             </Button>
           </div>
           <div className="activity-list">
-            {latestViolations.map((item) => (
+            {paginatedViolations.list.map((item) => (
               <div className="activity-item" key={item.id}>
                 <div className="activity-primary">
                   <button
@@ -77,6 +83,13 @@ export function OverviewPage() {
               </div>
             ))}
           </div>
+          <PaginationControls
+            page={paginatedViolations.page}
+            pageSize={paginatedViolations.pageSize}
+            total={paginatedViolations.total}
+            totalPages={paginatedViolations.totalPages}
+            onPageChange={setViolationPage}
+          />
         </SurfaceCard>
 
         <SurfaceCard>
@@ -87,7 +100,7 @@ export function OverviewPage() {
             </div>
           </div>
           <div className="activity-list">
-            {latestActions.map((item) => (
+            {paginatedActions.list.map((item) => (
               <div className="activity-item" key={item.id}>
                 <div className="activity-primary">
                   <button
@@ -109,6 +122,13 @@ export function OverviewPage() {
               </div>
             ))}
           </div>
+          <PaginationControls
+            page={paginatedActions.page}
+            pageSize={paginatedActions.pageSize}
+            total={paginatedActions.total}
+            totalPages={paginatedActions.totalPages}
+            onPageChange={setActionPage}
+          />
         </SurfaceCard>
       </section>
 

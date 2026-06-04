@@ -2,8 +2,10 @@ package procscanviolation
 
 import (
 	"context"
+	"strings"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/violationquery"
 )
 
 type Repository struct {
@@ -79,16 +81,68 @@ func (r *Repository) ListViolations(
 ) ([]ProcscanViolationEvent, error) {
 	var violations []ProcscanViolationEvent
 
-	query := r.db.WithContext(ctx)
-	if !includeAll {
-		query = query.Where(procscanEffectiveViolationCondition)
-	}
+	query := r.buildListQuery(ctx, includeAll, violationquery.ListOptions{})
 
 	if err := query.Order("detected_at DESC, id DESC").Find(&violations).Error; err != nil {
 		return nil, err
 	}
 
 	return violations, nil
+}
+
+func (r *Repository) ListViolationsPage(
+	ctx context.Context,
+	options violationquery.ListOptions,
+) ([]ProcscanViolationEvent, int64, error) {
+	var total int64
+
+	countQuery := r.buildListQuery(ctx, options.IncludeAll, options)
+	if err := countQuery.Model(&ProcscanViolationEvent{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var violations []ProcscanViolationEvent
+
+	query := r.buildListQuery(ctx, options.IncludeAll, options)
+	if err := query.
+		Order("detected_at DESC, id DESC").
+		Limit(options.PageSize).
+		Offset(options.Offset()).
+		Find(&violations).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return violations, total, nil
+}
+
+func (r *Repository) buildListQuery(
+	ctx context.Context,
+	includeAll bool,
+	options violationquery.ListOptions,
+) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&ProcscanViolationEvent{})
+	if !includeAll {
+		query = query.Where(procscanEffectiveViolationCondition)
+	}
+
+	if options.StartTime != nil {
+		query = query.Where("detected_at >= ?", *options.StartTime)
+	}
+
+	if options.Keyword != "" {
+		keyword := "%" + strings.ToLower(options.Keyword) + "%"
+		query = query.Where(
+			r.db.Where("LOWER(namespace) LIKE ?", keyword).
+				Or("LOWER(pod_name) LIKE ?", keyword).
+				Or("LOWER(node_name) LIKE ?", keyword).
+				Or("LOWER(process_name) LIKE ?", keyword).
+				Or("LOWER(process_command) LIKE ?", keyword).
+				Or("LOWER(match_rule) LIKE ?", keyword).
+				Or("LOWER(message) LIKE ?", keyword),
+		)
+	}
+
+	return query
 }
 
 func (r *Repository) DeleteViolationByID(ctx context.Context, id uint64) error {

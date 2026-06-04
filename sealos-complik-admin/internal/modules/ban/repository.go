@@ -3,9 +3,11 @@ package ban
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 const (
@@ -61,6 +63,51 @@ func (r *Repository) ListBans(ctx context.Context) ([]Ban, error) {
 	}
 
 	return bans, nil
+}
+
+func (r *Repository) ListBansPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+	operatorName string,
+) ([]Ban, int64, error) {
+	var total int64
+
+	countQuery := r.buildListQuery(ctx, keyword, operatorName)
+	if err := countQuery.Model(&Ban{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var bans []Ban
+
+	query := r.buildListQuery(ctx, keyword, operatorName)
+	if err := query.
+		Order("ban_start_time DESC, id DESC").
+		Limit(options.PageSize).
+		Offset(options.Offset()).
+		Find(&bans).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return bans, total, nil
+}
+
+func (r *Repository) buildListQuery(
+	ctx context.Context,
+	keyword string,
+	operatorName string,
+) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&Ban{})
+	if strings.TrimSpace(keyword) != "" {
+		value := "%" + strings.ToLower(strings.TrimSpace(keyword)) + "%"
+		query = query.Where("LOWER(namespace) LIKE ?", value)
+	}
+
+	if strings.TrimSpace(operatorName) != "" {
+		query = query.Where("operator_name = ?", strings.TrimSpace(operatorName))
+	}
+
+	return query
 }
 
 // DeleteBanByID deletes a single ban record by id.

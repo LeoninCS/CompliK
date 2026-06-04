@@ -1,5 +1,5 @@
 import { ArrowRight, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createSearchParams, useNavigate, useParams } from "react-router-dom";
 import {
   Button,
@@ -9,13 +9,14 @@ import {
   EmptyState,
   Input,
   PageHeader,
+  PaginationControls,
   StatusPill,
   SurfaceCard,
 } from "../components/ui";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { useAppData } from "../contexts/AppDataContext";
 import { buildCommitmentDownloadURL } from "../lib/api";
-import { formatURLWithDeviceProfile, formatViolationTypeLabel, summarizeMarkdown } from "../lib/utils";
+import { formatURLWithDeviceProfile, formatViolationTypeLabel, paginateItems, summarizeMarkdown } from "../lib/utils";
 import type { ViolationRecord } from "../types";
 
 function toneByBoolean(value: boolean, positiveTone: "success" | "warn" | "danger" = "success") {
@@ -27,25 +28,36 @@ export function NamespaceDetailPage() {
   const navigate = useNavigate();
   const { deleteViolationRecord, error, isLoading, namespaceProfiles, refreshAll, violations } = useAppData();
   const [keyword, setKeyword] = useState("");
+  const [violationPage, setViolationPage] = useState(1);
+  const [timelinePage, setTimelinePage] = useState(1);
   const [selectedViolation, setSelectedViolation] = useState<ViolationRecord | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ViolationRecord | null>(null);
 
   const profile = useMemo(
-    () => namespaceProfiles.find((item) => item.namespace === namespace) ?? namespaceProfiles[0] ?? null,
+    () => (namespace ? namespaceProfiles.find((item) => item.namespace === namespace) ?? null : null),
     [namespace, namespaceProfiles],
   );
   const recentViolations = useMemo(
-    () => (profile ? violations.filter((item) => item.namespace === profile.namespace).slice(0, 5) : []),
+    () => (profile ? violations.filter((item) => item.namespace === profile.namespace) : []),
     [profile, violations],
   );
+  const paginatedViolations = useMemo(() => paginateItems(recentViolations, violationPage), [recentViolations, violationPage]);
+  const paginatedTimeline = useMemo(() => paginateItems(profile?.timeline ?? [], timelinePage), [profile?.timeline, timelinePage]);
+
+  useEffect(() => {
+    setViolationPage(1);
+    setTimelinePage(1);
+  }, [profile?.namespace]);
 
   if (!profile) {
+    const canNavigate = keyword.trim().length > 0;
+
     return (
       <div className="page-container">
         <PageHeader
           kicker="Namespace"
           title={namespace ?? "命名空间详情"}
-          description="先判断违规记录、封禁和承诺书情况，再回看最近违规和处置时间线。"
+          description="输入 namespace 后查看违规记录、封禁、承诺书和处置时间线。"
           actions={
             <Button
               variant="secondary"
@@ -59,9 +71,27 @@ export function NamespaceDetailPage() {
         />
         <SurfaceCard>
           <EmptyState
-            title={isLoading ? "命名空间数据加载中" : "未找到命名空间数据"}
-            description={error ?? "当前没有可展示的命名空间记录，请先检查后端数据是否已同步。"}
+            title={isLoading ? "命名空间数据加载中" : namespace ? "未找到命名空间数据" : "请选择命名空间"}
+            description={error ?? (namespace ? "当前 namespace 没有可展示记录，请检查数据是否已同步。" : "直接点击命名空间详情时先停留在查询入口。")}
           />
+          <div className="toolbar" style={{ marginTop: 20 }}>
+            <label className="field">
+              <span className="field-label">namespace</span>
+              <div style={{ display: "flex", gap: 12 }}>
+                <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入 namespace" />
+                <Button
+                  disabled={!canNavigate}
+                  variant="secondary"
+                  onClick={() => {
+                    if (!canNavigate) return;
+                    navigate(`/namespaces/${keyword.trim()}`);
+                  }}
+                >
+                  <Search size={16} /> 查看详情
+                </Button>
+              </div>
+            </label>
+          </div>
         </SurfaceCard>
       </div>
     );
@@ -200,7 +230,7 @@ export function NamespaceDetailPage() {
               <p className="panel-description">点击某条记录会在右侧展开详情抽屉。</p>
             </div>
           </div>
-          {recentViolations.length > 0 ? (
+          {paginatedViolations.list.length > 0 ? (
             <div className="data-table-wrap">
               <table className="data-table">
                 <thead>
@@ -212,7 +242,7 @@ export function NamespaceDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentViolations.map((item) => (
+                  {paginatedViolations.list.map((item) => (
                     <tr key={item.id}>
                       <td>{formatViolationTypeLabel(item.type)}</td>
                       <td>
@@ -238,6 +268,13 @@ export function NamespaceDetailPage() {
               description="这个 namespace 目前没有需要跟进的违规事件。"
             />
           )}
+          <PaginationControls
+            page={paginatedViolations.page}
+            pageSize={paginatedViolations.pageSize}
+            total={paginatedViolations.total}
+            totalPages={paginatedViolations.totalPages}
+            onPageChange={setViolationPage}
+          />
         </SurfaceCard>
 
         <SurfaceCard>
@@ -248,7 +285,7 @@ export function NamespaceDetailPage() {
             </div>
           </div>
           <div className="timeline">
-            {profile.timeline.map((item) => (
+            {paginatedTimeline.list.map((item) => (
               <div className="timeline-item" key={item.id}>
                 <span className={`timeline-dot tone-${item.tone}`} style={{ backgroundColor: "currentColor" }} />
                 <div className="timeline-content">
@@ -261,6 +298,13 @@ export function NamespaceDetailPage() {
               </div>
             ))}
           </div>
+          <PaginationControls
+            page={paginatedTimeline.page}
+            pageSize={paginatedTimeline.pageSize}
+            total={paginatedTimeline.total}
+            totalPages={paginatedTimeline.totalPages}
+            onPageChange={setTimelinePage}
+          />
         </SurfaceCard>
       </div>
 

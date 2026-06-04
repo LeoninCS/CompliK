@@ -35,16 +35,18 @@ export function PageHeader({
 export function Button({
   children,
   variant = "secondary",
+  disabled = false,
   onClick,
   type = "button",
 }: {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
+  disabled?: boolean;
   onClick?: () => void;
   type?: "button" | "submit";
 }) {
   return (
-    <button className={cn("btn", `btn-${variant}`)} onClick={onClick} type={type}>
+    <button className={cn("btn", `btn-${variant}`)} disabled={disabled} onClick={onClick} type={type}>
       {children}
     </button>
   );
@@ -112,6 +114,54 @@ export function EmptyState({
         {description}
       </p>
       {action ? <div className="button-row" style={{ justifyContent: "center", marginTop: 18 }}>{action}</div> : null}
+    </div>
+  );
+}
+
+export function PaginationControls({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  const hasPreviousPage = totalPages > 0 && page > 1;
+  const hasNextPage = totalPages > 0 && page < totalPages;
+
+  return (
+    <div className="pagination-row">
+      <span className="muted-text">
+        共 {total} 条，每页 {pageSize} 条
+      </span>
+      <div className="button-row">
+        <Button
+          variant="secondary"
+          disabled={!hasPreviousPage}
+          onClick={() => {
+            if (hasPreviousPage) onPageChange(page - 1);
+          }}
+        >
+          上一页
+        </Button>
+        <span className="pagination-label">
+          第 {totalPages === 0 ? 0 : page} / {totalPages} 页
+        </span>
+        <Button
+          variant="secondary"
+          disabled={!hasNextPage}
+          onClick={() => {
+            if (hasNextPage) onPageChange(page + 1);
+          }}
+        >
+          下一页
+        </Button>
+      </div>
     </div>
   );
 }

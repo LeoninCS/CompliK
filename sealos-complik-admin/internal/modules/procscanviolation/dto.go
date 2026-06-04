@@ -3,6 +3,8 @@ package procscanviolation
 import (
 	"encoding/json"
 	"time"
+
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type NamespaceRequest struct {
@@ -55,3 +57,5 @@ type ViolationResponse struct {
 type ViolationStatusResponse struct {
 	Violated bool `json:"violated"`
 }
+
+type PaginatedViolationResponse = pagequery.PaginatedResponse[ViolationResponse]

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -10,27 +10,67 @@ import {
   Input,
   Modal,
   PageHeader,
+  PaginationControls,
   SurfaceCard,
 } from "../components/ui";
 import { useAppData } from "../contexts/AppDataContext";
-import { buildCommitmentDownloadURL } from "../lib/api";
-import type { CommitmentRecord } from "../types";
+import { buildCommitmentDownloadURL, listCommitmentRecordsPage } from "../lib/api";
+import type { CommitmentRecord, PaginatedRecords } from "../types";
 
 export function CommitmentsPage() {
   const navigate = useNavigate();
-  const { commitmentRecords, createCommitmentRecord, deleteCommitmentRecord } = useAppData();
+  const { createCommitmentRecord, deleteCommitmentRecord } = useAppData();
   const [selected, setSelected] = useState<CommitmentRecord | null>(null);
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<PaginatedRecords<CommitmentRecord>>({
+    list: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 0,
+  });
+  const [listError, setListError] = useState<string | null>(null);
+  const [isListLoading, setIsListLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<CommitmentRecord | null>(null);
   const [namespace, setNamespace] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const rows = useMemo(() => {
-    return commitmentRecords.filter((item) => item.namespace.toLowerCase().includes(keyword.toLowerCase()));
-  }, [commitmentRecords, keyword]);
+  const loadRows = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
+    try {
+      const nextData = await listCommitmentRecordsPage({
+        page,
+        keyword,
+      });
+      if (nextData.totalPages > 0 && page > nextData.totalPages) {
+        setPage(nextData.totalPages);
+        return;
+      }
+      setData(nextData);
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : "承诺书记录加载失败");
+      setData({
+        list: [],
+        total: 0,
+        page,
+        pageSize: 10,
+        totalPages: 0,
+      });
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [keyword, page]);
+
+  useEffect(() => {
+    void loadRows();
+  }, [loadRows]);
+
+  const rows = data.list;
 
   const handleCreateCommitment = async () => {
     if (!namespace.trim() || !file) {
@@ -52,6 +92,7 @@ export function CommitmentsPage() {
       setOpen(false);
       setNamespace("");
       setFile(null);
+      await loadRows();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "上传承诺书失败");
     } finally {
@@ -71,13 +112,32 @@ export function CommitmentsPage() {
       <SurfaceCard>
         <div className="toolbar">
           <Field label="namespace 搜索">
-            <Input placeholder="输入 namespace" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+            <Input
+              placeholder="输入 namespace"
+              value={keyword}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setPage(1);
+              }}
+            />
           </Field>
         </div>
       </SurfaceCard>
 
       <SurfaceCard className="data-table-wrap" padded={false}>
-        {rows.length > 0 ? (
+        {listError ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState
+              title="承诺书记录加载失败"
+              description={listError}
+              action={<Button variant="secondary" onClick={() => void loadRows()}>重新加载</Button>}
+            />
+          </div>
+        ) : isListLoading ? (
+          <div style={{ padding: 20 }}>
+            <EmptyState title="承诺书记录加载中" description="正在同步当前页数据。" />
+          </div>
+        ) : rows.length > 0 ? (
           <table className="data-table">
             <thead>
               <tr>
@@ -126,6 +186,14 @@ export function CommitmentsPage() {
           </div>
         )}
       </SurfaceCard>
+
+      <PaginationControls
+        page={page}
+        pageSize={data.pageSize}
+        total={data.total}
+        totalPages={data.totalPages}
+        onPageChange={setPage}
+      />
 
       <Drawer
         description="这里展示承诺书记录详情，并提供跳转到 namespace 详情的入口。"
@@ -219,6 +287,7 @@ export function CommitmentsPage() {
               setSelected(null);
             }
             setPendingDelete(null);
+            void loadRows();
           });
         }}
         open={Boolean(pendingDelete)}

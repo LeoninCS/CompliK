@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type Handler struct {
@@ -147,7 +148,40 @@ func (h *Handler) GetCommitment(c *gin.Context) {
 
 // ListCommitments handles listing all commitments.
 func (h *Handler) ListCommitments(c *gin.Context) {
+	if pagequery.HasPage(c.Query("page")) {
+		h.ListCommitmentsPage(c)
+		return
+	}
+
 	resp, err := h.service.ListCommitments(c.Request.Context())
+	if err != nil {
+		h.respondWithServiceError(c, err, "failed to list commitments")
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListCommitmentsPage(c *gin.Context) {
+	var req ListCommitmentsQueryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid request query",
+			"error":   err.Error(),
+		})
+
+		return
+	}
+
+	options, err := pagequery.NewOptions(req.Page)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "invalid page query",
+		})
+		return
+	}
+
+	resp, err := h.service.ListCommitmentsPage(c.Request.Context(), options, req.Keyword)
 	if err != nil {
 		h.respondWithServiceError(c, err, "failed to list commitments")
 		return

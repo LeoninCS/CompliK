@@ -2,8 +2,10 @@ package commitment
 
 import (
 	"context"
+	"strings"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type Repository struct {
@@ -43,6 +45,42 @@ func (r *Repository) ListCommitments(ctx context.Context) ([]Commitment, error) 
 	}
 
 	return commitments, nil
+}
+
+func (r *Repository) ListCommitmentsPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+) ([]Commitment, int64, error) {
+	var total int64
+
+	countQuery := r.buildListQuery(ctx, keyword)
+	if err := countQuery.Model(&Commitment{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var commitments []Commitment
+
+	query := r.buildListQuery(ctx, keyword)
+	if err := query.
+		Order("updated_at DESC, id DESC").
+		Limit(options.PageSize).
+		Offset(options.Offset()).
+		Find(&commitments).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return commitments, total, nil
+}
+
+func (r *Repository) buildListQuery(ctx context.Context, keyword string) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&Commitment{})
+	if strings.TrimSpace(keyword) != "" {
+		value := "%" + strings.ToLower(strings.TrimSpace(keyword)) + "%"
+		query = query.Where("LOWER(namespace) LIKE ?", value)
+	}
+
+	return query
 }
 
 // UpdateCommitment updates an existing commitment record.

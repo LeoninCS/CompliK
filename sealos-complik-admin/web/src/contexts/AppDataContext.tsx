@@ -303,7 +303,6 @@ function buildStats(
 function buildLatestViolations(violations: ViolationRecord[]): ActivityItem[] {
   return [...violations]
     .sort((a, b) => getTimeMs(b.detectedAtMs, b.detectedAt) - getTimeMs(a.detectedAtMs, a.detectedAt))
-    .slice(0, 3)
     .map((item) => ({
       id: item.id,
       namespace: item.namespace,
@@ -358,7 +357,6 @@ function buildLatestActions(
 
   return actions
     .sort(compareNewestFirst)
-    .slice(0, 3)
     .map(({ sortTime: _sortTime, sequence: _sequence, ...item }) => item);
 }
 

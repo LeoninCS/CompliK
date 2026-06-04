@@ -3,6 +3,8 @@ package projectconfig
 import (
 	"encoding/json"
 	"time"
+
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 type ProjectConfigNameRequest struct {
@@ -11,6 +13,11 @@ type ProjectConfigNameRequest struct {
 
 type ProjectConfigTypeRequest struct {
 	ConfigType string `uri:"config_type" binding:"required,max=50"`
+}
+
+type ListProjectConfigsQueryRequest struct {
+	Page    int    `form:"page"`
+	Keyword string `form:"keyword"`
 }
 
 type CreateProjectConfigRequest struct {
@@ -35,3 +42,5 @@ type ProjectConfigResponse struct {
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }
+
+type PaginatedProjectConfigResponse = pagequery.PaginatedResponse[ProjectConfigResponse]

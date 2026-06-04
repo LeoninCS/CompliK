@@ -12,7 +12,7 @@ import { cn } from "../lib/utils";
 
 const navItems = [
   { label: "总览", path: "/overview", icon: LayoutGrid },
-  { label: "命名空间详情", path: "/namespaces/prod-finance", icon: ShieldCheck },
+  { label: "命名空间详情", path: "/namespaces", icon: ShieldCheck },
   { label: "违规中心", path: "/violations", icon: AlertTriangle },
   { label: "项目配置", path: "/configs", icon: FileCog },
   { label: "承诺书管理", path: "/commitments", icon: FileText },

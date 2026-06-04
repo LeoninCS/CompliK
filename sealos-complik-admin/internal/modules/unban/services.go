@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 var (
@@ -85,6 +86,27 @@ func (s *Service) ListUnbans(ctx context.Context) ([]UnbanResponse, error) {
 	}
 
 	return responses, nil
+}
+
+func (s *Service) ListUnbansPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+	operatorName string,
+) (*PaginatedUnbanResponse, error) {
+	unbans, total, err := s.repository.ListUnbansPage(ctx, options, keyword, operatorName)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]UnbanResponse, 0, len(unbans))
+	for i := range unbans {
+		responses = append(responses, *toUnbanResponse(&unbans[i]))
+	}
+
+	response := pagequery.NewPaginatedResponse(responses, total, options)
+
+	return &response, nil
 }
 
 type normalizedUnbanInput struct {

@@ -8,6 +8,7 @@ import (
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"sealos-complik-admin/internal/modules/pagequery"
 )
 
 var (
@@ -123,6 +124,26 @@ func (s *Service) ListProjectConfigs(ctx context.Context) ([]ProjectConfigRespon
 	}
 
 	return responses, nil
+}
+
+func (s *Service) ListProjectConfigsPage(
+	ctx context.Context,
+	options pagequery.Options,
+	keyword string,
+) (*PaginatedProjectConfigResponse, error) {
+	projectConfigs, total, err := s.repository.ListProjectConfigsPage(ctx, options, keyword)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]ProjectConfigResponse, 0, len(projectConfigs))
+	for i := range projectConfigs {
+		responses = append(responses, *toProjectConfigResponse(&projectConfigs[i]))
+	}
+
+	response := pagequery.NewPaginatedResponse(responses, total, options)
+
+	return &response, nil
 }
 
 // ListProjectConfigsByType returns project configurations filtered by config type.
