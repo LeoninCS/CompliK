@@ -129,6 +129,7 @@ export function DiscoveredPathsPage() {
 
   useEffect(() => {
     resetPathCursor();
+    setPathsError(null);
     setPathsData(emptyPaths);
   }, [selectedRoute]);
 
