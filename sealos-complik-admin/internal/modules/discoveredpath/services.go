@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	ErrDiscoveredPathInvalidInput = errors.New("namespace, ingress_name, host, path, count, and last_seen_at are required")
-	ErrDiscoveredPathNotFound     = errors.New("discovered path not found")
+	ErrDiscoveredPathInvalidInput  = errors.New("invalid discovered path request")
+	ErrDiscoveredPathInvalidCursor = errors.New("invalid discovered path cursor")
+	ErrDiscoveredPathNotFound      = errors.New("discovered path not found")
 )
 
 const (
@@ -104,6 +105,7 @@ func (s *Service) ListRoutes(
 	}
 
 	limit := normalizeListLimit(req.Limit)
+
 	routes, err := s.repository.ListRoutes(ctx, listRoutesOptions{
 		Cursor:      cursor,
 		Limit:       limit,
@@ -120,6 +122,7 @@ func (s *Service) ListRoutes(
 	if hasMore {
 		routes = routes[:limit]
 	}
+
 	if routes == nil {
 		routes = make([]DiscoveredRouteResponse, 0)
 	}
@@ -141,6 +144,7 @@ func (s *Service) ListPaths(
 	}
 
 	limit := normalizeListLimit(req.Limit)
+
 	paths, err := s.repository.ListPaths(ctx, listPathsOptions{
 		Cursor:      cursor,
 		Limit:       limit,
@@ -345,22 +349,22 @@ func parsePathCursor(raw string) (*pathListCursor, error) {
 
 	parts := strings.Split(trimmed, ",")
 	if len(parts) != 3 {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	count, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil || count == 0 {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	lastSeenAt, err := parseCursorTime(parts[1])
 	if err != nil {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	id, err := strconv.ParseUint(parts[2], 10, 64)
 	if err != nil || id == 0 {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	return &pathListCursor{
@@ -378,12 +382,12 @@ func parseRouteCursor(raw string) (*routeListCursor, error) {
 
 	parts := strings.Split(trimmed, ",")
 	if len(parts) != 4 {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	lastSeenAt, err := parseCursorTime(parts[0])
 	if err != nil {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	cursor := routeListCursor{
@@ -393,7 +397,7 @@ func parseRouteCursor(raw string) (*routeListCursor, error) {
 		Host:        strings.ToLower(strings.TrimSpace(parts[3])),
 	}
 	if cursor.Namespace == "" || cursor.IngressName == "" || cursor.Host == "" {
-		return nil, ErrDiscoveredPathInvalidInput
+		return nil, ErrDiscoveredPathInvalidCursor
 	}
 
 	return &cursor, nil
@@ -419,7 +423,13 @@ func nextPathCursor(paths []DiscoveredPath, hasMore bool) string {
 	}
 
 	last := paths[len(paths)-1]
-	return fmt.Sprintf("%d,%s,%d", last.Count, formatCursorTime(last.LastSeenAt), last.ID)
+
+	return fmt.Sprintf(
+		"%d,%s,%d",
+		last.Count,
+		formatCursorTime(last.LastSeenAt),
+		last.ID,
+	)
 }
 
 func nextRouteCursor(routes []DiscoveredRouteResponse, hasMore bool) string {
@@ -428,6 +438,7 @@ func nextRouteCursor(routes []DiscoveredRouteResponse, hasMore bool) string {
 	}
 
 	last := routes[len(routes)-1]
+
 	return strings.Join([]string{
 		formatCursorTime(last.LastSeenAt),
 		last.Namespace,

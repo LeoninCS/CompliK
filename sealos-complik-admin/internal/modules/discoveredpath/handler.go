@@ -123,6 +123,10 @@ func (h *Handler) respondWithServiceError(c *gin.Context, err error, fallbackMes
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": err.Error(),
 		})
+	case errors.Is(err, ErrDiscoveredPathInvalidCursor):
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
 	case errors.Is(err, ErrDiscoveredPathNotFound):
 		c.JSON(http.StatusNotFound, gin.H{
 			"message": err.Error(),
